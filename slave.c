@@ -20,11 +20,14 @@ void exitOnError(char* msg){
 }
 
 int main(){
+
+
+    int pipefd[2];
     int myPid = getpid();
     //hay que ver si esta bien hacerlo con getline -> no seria bueno que la app quede blockeada en write por esto
     char *path = NULL;
     size_t size;
-    int pipefd[2];
+
     int wstatus;
     char *buf = malloc(MAXREAD);
     while(getline(&path,&size,stdin) != EOF){ //getline ejecuta read bloquante -> no hacemos busy wating
@@ -43,6 +46,7 @@ int main(){
            close(pipefd[1]);
             char * argv[] = {"./md5sum", str,NULL};
             char * envp[] = {NULL};
+            free(str); //   If we do not free STR the memory will leak!
             if(execve(MD5SUM,argv,envp) == ERROR) exitOnError("EXEC ERROR\n");
         }
         if(pid == ERROR) exitOnError("FORK ERROR\n");
