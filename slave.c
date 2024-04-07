@@ -1,54 +1,95 @@
-/*idea: Recibo paths por stdin -> ¿Recibo EOF? -> exit()
-                                -> recibo path -> llamamos a md5sum (podriamos usar popen)
-                                               -> toma el result, imprime en stdout str del estilo "path result mypid"
-       ->vuelvo a consultar stdin   (con read para no hacer busy w)                           
-*/
-//popen()
-#include <stdio.h>
-#include <stdlib.h>
+
 #include <string.h>
 #include <unistd.h>
+#include "utils.h"
 
-#define CHILD 0
-#define ERROR -1
+
 #define MD5SUM "./md5sum"
-#define MAXREAD 256
+#define MAXBUF 256
+#define MAXREAD 1024
+#define MAXPATHS 10
+#define MAXPATHSIZE 50
+#define ISNEWLINE(a) ((a) == '\n')
 
-void exitOnError(char* msg){
-    perror(msg);
-    exit(1);
+int getPath(char** files);
+int parse(char** files, char* buf,size_t size);
+void md5sum(int pipefd[2], char* path);
+
+int main(int argc, char * argv[], char* envp[]){
+    int myPid = getpid();
+    int pipefd[2];
+    char ** paths = malloc(sizeof(char*)*MAXPATHS); // matriz donde vamos a cargar los paths
+    int pathCount;
+
+    while((pathCount = getPath(paths)) != EOF){
+        int i = 0;
+        while(i < pathCount){
+            if(pipe(pipefd) == ERROR) exitOnError("PIPE ERROR\n");        
+            md5sum(pipefd,paths[i]);        
+            char *buf = malloc(MAXBUF);
+            read(pipefd[0],buf,MAXBUF);
+            printf("File: %s - md5: %s - Processed by: %d",paths[i],buf,myPid);
+            free(buf);
+            free(paths[i]); //fue alocado en parse()    
+            close(pipefd[0]);
+            close(pipefd[1]);
+            i++;
+        }
+    }
+
+    free(paths);
+
+    exit(0);
 }
 
-int main(){
-    int myPid = getpid();
-    //hay que ver si esta bien hacerlo con getline -> no seria bueno que la app quede blockeada en write por esto
-    char *path = NULL;
-    size_t size;
-    int pipefd[2];
-    int wstatus;
-    char *buf = malloc(MAXREAD);
-    while(getline(&path,&size,stdin) != EOF){ //getline ejecuta read bloquante -> no hacemos busy wating
-        if(pipe(pipefd) == ERROR) exitOnError("PIPE ERROR\n");
+
+
+
+void md5sum(int pipefd[2],char* path){
         int pid = fork();
         if(pid == CHILD){
-            char* str = malloc(strlen(path)-1);
-            for(int i = 0; i < (strlen(path)-1); i++){
-                str[i] = path[i];
-            }
-            str[strlen(path)] = '\0';
-            
-           close(pipefd[0]);
+           close(pipefd[0]);     
            close(1);
            dup(pipefd[1]);
            close(pipefd[1]);
-            char * argv[] = {"./md5sum", str,NULL};
+            char * argv[] = {MD5SUM, path,NULL};
             char * envp[] = {NULL};
             if(execve(MD5SUM,argv,envp) == ERROR) exitOnError("EXEC ERROR\n");
         }
         if(pid == ERROR) exitOnError("FORK ERROR\n");
-        
-        read(pipefd[0],buf,MAXREAD);
-        printf("%s",buf);
+        //AGREGAR MANEJO DE ERRORES DE MD5SUM
+}
+
+//Guarda en files los paths de los archivos como strings y devuelve la cantidad de archivos
+int parse(char** files, char* buf,size_t size){
+    char* path = NULL;
+    int pathCount = 0;
+    for(size_t i = 0 , j = 0; i <= size && j < MAXPATHSIZE; i++, j++){
+        if(path == NULL){
+            path = malloc(MAXPATHSIZE);
+        }
+        if(ISNEWLINE(buf[i])){
+            path[j] = '\0';
+            files[pathCount++] = path;
+            path = NULL;
+            j = 0;
+            continue;
+        }
+
+        path[j] = buf[i];
+
     }
+
+    return pathCount;
+}
+
+//lee de stdin y parsea
+int getPath(char** files){
+    char* readBuf = malloc(MAXREAD);
+    size_t size = read(STDIN,readBuf,MAXREAD);
+    if( size == 0){
+        return EOF;
+    }
+    return parse(files,readBuf,size);
 
 }
