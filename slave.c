@@ -14,7 +14,7 @@ static int myPid; //estara bien esto??
 
 int main(int argc, char * argv[], char* envp[]){
     myPid = getpid();
-    int pipefd[2];
+    int ReadPipefd[2];
     char* path = NULL;
     size_t len = 0;
     size_t readBytes;
@@ -22,10 +22,12 @@ int main(int argc, char * argv[], char* envp[]){
     while( (readBytes = getline(&path,&len,stdin)) != EOF){
         if(readBytes == 0) exitOnError("Bad Path"); // esta ok?
         path[readBytes-1] = '\0'; //Change \n for \0
-        proccesPath(path,pipefd);
+        proccesPath(path,ReadPipefd);
     }
     if(path != NULL)  free(path);
 
+    //  El Slave tambien debe enviar por OTRO Pipe el resultado de MD5Sum.
+    //  Las pipes para eso estan creadas en Master.
     exit(0);
 }
 
