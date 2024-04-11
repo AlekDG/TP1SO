@@ -32,12 +32,10 @@ int main(int argc, char  ** argv){
     for(int i = 0; i < MAX_CHILDREN; i++){
         MSpipeCheck = pipe(MasterSlavePipes[i]);
         if(MSpipeCheck == -1){
-            perror("Pipe ERROR\n");
-            exit(1);
+            exitOnError("PIPE ERROR");
         }
         //  The Pipeline is already created. Now we have to assign read and write -ends.
         //  I am the parent. I do not need to read from the child process using this pipe.
-        close(MasterSlavePipes[i][0]);
     }
     // M->S PIPE CREATION AREA END.
     // SLAVE->MASTER PIPE CREATION AREA.
@@ -49,7 +47,6 @@ int main(int argc, char  ** argv){
             exitOnError("Slave to Master pipe creation ERROR");
         }
         //  Esta Pipe se usa desde el Master para leer solamente. No necesito escribir.
-        close(slaveMasterPipes[i][1]);
     }
     // SLAVE->MASTER PIPE CREATION AREA END.
 
@@ -73,8 +70,7 @@ int main(int argc, char  ** argv){
             exit(1);
         }
         else if(pid < 0) {
-            perror("Fork error");
-            exit(1);
+            exitOnError("FORK ERROR\n");
         }
         else{
             //  I am the master
@@ -104,9 +100,9 @@ int main(int argc, char  ** argv){
     sem_t accessToView;
     sem_init(&accessToView, 1, 1);  //  This semaphore allows access to the shared memory.
 
-    sem_t slaveFinishedSemaphores[MAX_CHILDREN];
+    sem_t finishedSemaphores[MAX_CHILDREN];
     for(int i = 0; i < MAX_CHILDREN; i++){
-        sem_init(&slaveFinishedSemaphores[i], 1, 0);
+        sem_init(&finishedSemaphores[i], 1, 0);
         //  Every slave will, when it has finished writing in the pipe, set its semaphore to 1.
         //  Then, the master will read only from the children that have the semaphore in 1.
     }
@@ -124,7 +120,7 @@ int main(int argc, char  ** argv){
     while(resultsReceived != argc -1){
         //  Receive results by pipe.
         for(int i = 0; i < MAX_CHILDREN; i++){
-            sem_wait(&slaveFinishedSemaphores[i]);  //  Si no termino, esperarlo.
+            sem_wait(&finishedSemaphores[i]);  //  Si no termino, esperarlo.
             read(slaveMasterPipes[i][0], readBuffer, MAXREAD);
         }
         resultsReceived++;
