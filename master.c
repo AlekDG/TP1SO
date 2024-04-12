@@ -20,7 +20,7 @@
 #define MAXREAD 256
 #define MAX_WRITE 256
 #define MAX_CHILDREN 3
-#define MAXFD 7
+#define MAXFD 16
 
 int main(int argc, char  ** argv){
     //  MASTER->SLAVE PIPE CREATION AREA.
@@ -78,6 +78,10 @@ int main(int argc, char  ** argv){
             //  I am the master
             pids[i] = pid;
             printf("Activado el slave %d\n", pids[i]);
+            //  I am the master. I only want to write to the slaves using the first set of pipes. I must close read-end.
+            close(MasterSlavePipes[i][0]);
+            //  I am the master. I only want to read from the slaves using the second set of pipes. I must close write-end.
+            close(slaveMasterPipes[i][1]);
             //  I will now write the debug messages to the slaves.
             for(int j = 0; j < MAX_CHILDREN; j++){
                 write(MasterSlavePipes[i][1], messages[i], MAX_WRITE);
@@ -102,15 +106,6 @@ int main(int argc, char  ** argv){
     sem_t accessToView;
     sem_init(&accessToView, 1, 1);  //  This semaphore allows access to the shared memory.
 
-   /* sem_t finishedSemaphores[MAX_CHILDREN];
-    * *************ESTO SE PUEDE HACER CON SELECT**********
-    for(int i = 0; i < MAX_CHILDREN; i++){
-        sem_init(&finishedSemaphores[i], 1, 0);
-        //  Every slave will, when it has finished writing in the pipe, set its semaphore to 1.
-        //  Then, the master will read only from the children that have the semaphore in 1.
-    }
-    */
-    //*************ESTO SE PUEDE HACER CON SELECT**********
     char readBuffer[MAXREAD];
 
     char * sharedMem;
@@ -129,23 +124,25 @@ int main(int argc, char  ** argv){
 
         //  Agregar el FD de lectura a readFs.
         FD_ZERO(&readFs);
-
-        //  0 no es correcto aca. Por que FD va a recibir?
-        FD_SET(0, &readFs);
-        //  Por que FD voy a recibir?
-
-        //  Me gustaria que cada uno de los esclavos retorne a un FD distinto.
-        //  Como se a cual FD escriben las pipes de los esclavos?
-        //  Necesito saber a que FD escriben las pipes de los esclavos antes de salir.
+        for(int i = 0; i < MAX_CHILDREN; i++){
+            FD_SET(slaveMasterPipes[i][0], &readFs);
+        }
 
         //  La idea seria sacar con PSelect cuantos de esos FDs estan disponibles en un determinado momento,
         //  y una vez que lo sepa, ir iterando sobre los hijos y haciendo read.
         //  La idea seria iterar solo si la mayoria esta en estado ready, osea si FDsAvailableForReading > MAX_CHILDREN/2 + 1.
 
-
         FDsAvailableForReading = pselect(MAXFD, &readFs, NULL, NULL, NULL, NULL);
+        if(FDsAvailableForReading > MAX_CHILDREN/2 + 1){
+            for(int i = 0; i < MAX_CHILDREN && FDsAvailableForReading != 0; i++){
+                if(read(slaveMasterPipes[i][0], readBuffer, MAXREAD) != 0){
+                    FDsAvailableForReading--;
+                    resultsReceived++;
+                }
+            }
+        }
 
-        resultsReceived++;
+
         //  Write results to shared memory.
     }
 
