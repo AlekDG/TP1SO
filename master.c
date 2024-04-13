@@ -2,7 +2,7 @@
 // Created by jo on 07/04/24.
 //
 
-
+#include <sys/select.h>
 #include <string.h>
 #include <unistd.h>
 #include <sys/wait.h>
@@ -10,8 +10,8 @@
 #include "utils.h"
 #include <sys/mman.h>
 #include <sys/stat.h>        /* For mode constants */
-#include <fcntl.h>           /* For O_* constants */
-#include <sys/select.h>
+#include <fcntl.h>          /* For O_* constants */
+
 
 
 #define MAXREAD 256
@@ -155,7 +155,7 @@ int main(int argc, char  ** argv){
         //  y una vez que lo sepa, ir iterando sobre los hijos y haciendo read.
         //  La idea seria iterar solo si la mayoria esta en estado ready, osea si FDsAvailableForReading > MAX_CHILDREN/2 + 1.
 
-        FDsAvailableForReading = pselect(MAXFD, &readFs, NULL, NULL, NULL, NULL);
+        FDsAvailableForReading = select(MAXFD, &readFs, NULL, NULL, NULL);
         if(FDsAvailableForReading > 0){                               //Deberiamos leer apenas hay info -> rescatar que fd esta ready
             for(int i = 0; i < MAX_CHILDREN && FDsAvailableForReading != 0; i++){
                 if(read(slaveMasterPipes[i][0], readBuffer, MAXREAD) != 0){
