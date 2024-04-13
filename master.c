@@ -13,6 +13,7 @@
 #include <fcntl.h>           /* For O_* constants */
 #include <sys/select.h>
 
+
 #define MAXREAD 256
 #define MAX_WRITE 256
 #define MAX_CHILDREN 3
@@ -119,7 +120,7 @@ int main(int argc, char  ** argv){
 
     char readBuffer[MAXREAD];
 
-    char * sharedMem;
+    char * sharedMem = 0;
     int shmFd;
     if((shmFd =  shm_open(sharedMem, 0666 | O_CREAT, 0)) == -1){
         exitOnError("Shared Memory Creation ERROR");
