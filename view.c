@@ -32,7 +32,7 @@ int main(int argc, char *argv[]) {
     // Hacemos print de la informacion
     int printAmount=atoi(argv[2]);
     for(int i=0;i<printAmount;i++) {
-        printf(info);
+        printf("%s\n", info);
     }
     //Desacoplamos el array
     shmdt(info);
