@@ -2,8 +2,7 @@
 // Created by jo on 07/04/24.
 //
 
-#include <stdio.h>
-#include <stdlib.h>
+
 #include <string.h>
 #include <unistd.h>
 #include <sys/wait.h>
@@ -14,9 +13,6 @@
 #include <fcntl.h>           /* For O_* constants */
 #include <sys/select.h>
 
-#define CHILD 0
-#define ERROR -1
-#define MD5SUM "./md5sum"
 #define MAXREAD 256
 #define MAX_WRITE 256
 #define MAX_CHILDREN 3
@@ -25,15 +21,14 @@
 int main(int argc, char  ** argv){
     //  MASTER->SLAVE PIPE CREATION AREA.
     int MasterSlavePipes [MAX_CHILDREN][2];
-    int MSpipeCheck;
     //  Process A keeps the write end open and closes the read end of the pipe. It can only write to process B.
     //  I can gather all pipes in one matrix.
     //  thePipes[n] is the n-th file descriptor array.
     //  thePipes[n][0] is the read-end of pipe n.
     //  thePipes[n][1] is the write-end of pipe n.
     for(int i = 0; i < MAX_CHILDREN; i++){
-        MSpipeCheck = pipe(MasterSlavePipes[i]);
-        if(MSpipeCheck == -1){
+        
+        if(pipe(MasterSlavePipes[i]) == ERROR){                                                 
             exitOnError("PIPE ERROR");
         }
         //  The Pipeline is already created. Now we have to assign read and write -ends.
@@ -42,10 +37,8 @@ int main(int argc, char  ** argv){
     // M->S PIPE CREATION AREA END.
     // SLAVE->MASTER PIPE CREATION AREA.
     int slaveMasterPipes[MAX_CHILDREN][2];
-    int SMPipeCheck;
     for(int i = 0; i < MAX_CHILDREN; i++){
-        SMPipeCheck = pipe(slaveMasterPipes[i]);
-        if(SMPipeCheck == -1){
+        if(pipe(slaveMasterPipes[i]) == ERROR){
             exitOnError("Slave to Master pipe creation ERROR");
         }
         //  Esta Pipe se usa desde el Master para leer solamente. No necesito escribir.
@@ -53,18 +46,12 @@ int main(int argc, char  ** argv){
     // SLAVE->MASTER PIPE CREATION AREA END.
 
 
-    //  MESSAGE CREATION AREA - FOR DEBUGGING ONLY.
-    char * msg1 = "We the People\n";
-    char * msg2 = "The First Law of Robotics states that a robot cannot harm a human being or through inaction, allow a human being to come to harm\n";
-    char * msg3 = "The previous message was very long.\n";
-    char * messages[3] = {msg1, msg2, msg3};
-    //  MESSAGE CREATION AREA END.
 
-    printf("Starting Master\n");
-    int pids[MAX_CHILDREN];
-    for (int i=0; i < MAX_CHILDREN; i++){
+    printf("Starting Master\n");                                                        
+    int pids[MAX_CHILDREN];                                                             //VER SI ES NECESARIO
+    for (int i=0; i < MAX_CHILDREN; i++){ 
         pid_t pid = fork();
-        if (pid == CHILD){
+        if (pid == CHILD){                                                                  //AGREGAR CLOSE;DUP;ETC
             //  I am the slave and will jump to slave program.
             char *args[] = {"./slave", NULL};
             execve(args[0], args, NULL);
@@ -79,16 +66,12 @@ int main(int argc, char  ** argv){
             pids[i] = pid;
             printf("Activado el slave %d\n", pids[i]);
             //  I am the master. I only want to write to the slaves using the first set of pipes. I must close read-end.
-            close(MasterSlavePipes[i][0]);
+            close(MasterSlavePipes[i][0]);                                                        //DENIFIR MACRO PARA WRITE-READ PIPE END
             //  I am the master. I only want to read from the slaves using the second set of pipes. I must close write-end.
             close(slaveMasterPipes[i][1]);
-            //  I will now write the debug messages to the slaves.
-            for(int j = 0; j < MAX_CHILDREN; j++){
-                write(MasterSlavePipes[i][1], messages[i], MAX_WRITE);
-            }
             //  I will now write the FILE PATHS IN ARGV TO THE SLAVES.
             int currentSlave = 0;
-            for(int j = 0; argv[j] == NULL; j++){
+            for(int j = 0; argv[j] == NULL; j++){                                                       //ARRANCA EN 1 ->agregar verificacion argc > 1
                 if(currentSlave == MAX_CHILDREN){
                     currentSlave = 0;
                 }
@@ -125,7 +108,7 @@ int main(int argc, char  ** argv){
         //  Agregar el FD de lectura a readFs.
         FD_ZERO(&readFs);
         for(int i = 0; i < MAX_CHILDREN; i++){
-            FD_SET(slaveMasterPipes[i][0], &readFs);
+            FD_SET(slaveMasterPipes[i][0], &readFs);                     //Deberiamos sacar cuando el slave muera -> si no hay errorman
         }
 
         //  La idea seria sacar con PSelect cuantos de esos FDs estan disponibles en un determinado momento,
@@ -133,7 +116,7 @@ int main(int argc, char  ** argv){
         //  La idea seria iterar solo si la mayoria esta en estado ready, osea si FDsAvailableForReading > MAX_CHILDREN/2 + 1.
 
         FDsAvailableForReading = pselect(MAXFD, &readFs, NULL, NULL, NULL, NULL);
-        if(FDsAvailableForReading > MAX_CHILDREN/2 + 1){
+        if(FDsAvailableForReading > MAX_CHILDREN/2 + 1){                               //Deberiamos leer apenas hay info -> rescatar que fd esta ready
             for(int i = 0; i < MAX_CHILDREN && FDsAvailableForReading != 0; i++){
                 if(read(slaveMasterPipes[i][0], readBuffer, MAXREAD) != 0){
                     FDsAvailableForReading--;

@@ -56,7 +56,7 @@ void md5sum(int pipefd[2],char* path){
            close(pipefd[1]);
             char * argv[] = {MD5SUM,"-z", path,NULL}; // -z makes md5sum return a null terminated string instead of a newline terminated string
             char * envp[] = {NULL};
-            if(execve(MD5SUM,argv,envp) == ERROR) exitOnError("EXEC ERROR\n");
+            if(execve(MD5SUM,argv,envp) == ERROR) exitOnError("EXEC ERROR\n");  //NO HACE FALTA EL IF -> Si pase el execve ni se ejecuta!!
         }
         if(pid == ERROR) exitOnError("FORK ERROR\n");
 }
