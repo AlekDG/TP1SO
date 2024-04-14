@@ -11,12 +11,12 @@
 #define MAX_CHILDREN 3
 #define MAXFD 16
 #define RWCREAT (0666 | O_CREAT)
-
+#define FINISHED 0
+#define TERMINATED -1
+#define OUTPUT_FILE "./outputFile"
 #define SHM_SIZE 1024
 
 sem_t * accessToShm;
-sem_t empty;
-sem_t full;
 
 int main(int argc, char  ** argv){
 
@@ -104,8 +104,7 @@ int main(int argc, char  ** argv){
     int resultsReceived = 0;
 
     if ((accessToShm = sem_open("/accesToShm", O_CREAT | O_EXCL, 0666, 1)) == SEM_FAILED) {
-        perror("sem_open");
-        exit(1);
+        exitOnError("Sem Open Error\n");
     }
 
     char readBuffer[MAXREAD];
@@ -127,16 +126,26 @@ int main(int argc, char  ** argv){
 
     fd_set readFs;
     int FDsAvailableForReading;
+
+    //  Create the output file.
+    int outputFileDescriptor = open(OUTPUT_FILE, O_CREAT);
+    if(outputFileDescriptor == ERROR){
+        exitOnError("Output file creation error.\n");
+    }
+
     while(resultsReceived != argc -1){
 
         FD_ZERO(&readFs);
 
         for(int j = 0; j < MAX_CHILDREN; j++) {
             int status;
-            pid_t return_pid = waitpid(pids[j], &status, WNOHANG);
-            if (return_pid == -1) {
+          /*  pid_t return_pid = waitpid(pids[j], &status, WNOHANG);
+            if (return_pid == ERROR) {
                 exitOnError("Wait error on second+ write\n");
             } else if (return_pid == 0) {
+                FD_SET(slaveToMasterPipes[j][READ_END], &readFs);
+            }*/
+            if(pids[j] != TERMINATED){
                 FD_SET(slaveToMasterPipes[j][READ_END], &readFs);
             }
         }
@@ -150,18 +159,19 @@ int main(int argc, char  ** argv){
                     resultsReceived++;
 
 
-                    sem_wait(&accessToShm);
+                    sem_wait(accessToShm);
                     write(shmID, readBuffer, MAX_WRITE);
-                    sem_post(&accessToShm);
-
+                    sem_post(accessToShm);
+                    //  Write a un archivo
+                    write(outputFileDescriptor, readBuffer, MAX_WRITE);
                     //  Escribir de vuelta al hijo.
 
                     if (pathsProcessed < argc) {
                         write(masterToSlavePipes[i][WRITE_END], argv[pathsProcessed++], MAX_WRITE);
                     }
                 }
-                else if (readCheck == 0){
-                    ;
+                else if (readCheck == FINISHED){
+                    pids[i] = TERMINATED;
                 }
                 else{
                     exitOnError("Failed to read from children\n");
@@ -173,6 +183,9 @@ int main(int argc, char  ** argv){
         }
     }
 
+    if(close(outputFileDescriptor) == ERROR){
+        exitOnError("Error on closing the output file\n");
+    }
     for(int i = 0; i < MAX_CHILDREN; i++){
         if(waitpid(pids[i], NULL, WUNTRACED) == -1){
             exitOnError("Final wait error\n");
