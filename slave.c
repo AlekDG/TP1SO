@@ -8,13 +8,13 @@
 #define MAXBUF 33
 #define STDIN 0
 
-void md5sum(int pipefd[2], char* path);
+void md5sum(int pipefd[PIPE_FD_ARR_SIZE], char* path);
 void proccesPath(char* path,int* pipeFileDescriptors);
 static int myPid; //estara bien esto??
 
 int main(int argc, char * argv[], char* envp[]){
     myPid = getpid();
-    int ReadPipefd[2];
+    int ReadPipefd[PIPE_FD_ARR_SIZE];
     char* path = NULL;
     size_t len = 0;
     size_t readBytes;
@@ -35,25 +35,25 @@ void proccesPath(char* path,int* pipeFileDescriptors){
     if(pipe(pipeFileDescriptors) == ERROR) exitOnError("PIPE ERROR\n");        
     md5sum(pipeFileDescriptors,path);                    
     char *buf = malloc(MAXBUF);            
-    read(pipeFileDescriptors[0],buf,MAXBUF); // -> no se si leer todo y despues cortarlo
+    read(pipeFileDescriptors[READ_END],buf,MAXBUF); // -> no se si leer todo y despues cortarlo
     buf[MAXBUF-1] = '\0'; // -> no es lindo
     printf("File: %s - md5: %s - Processed by: %d\n",path,buf,myPid); //deberia ser aparte para separar back/front
     free(buf);   
-    close(pipeFileDescriptors[0]);
-    close(pipeFileDescriptors[1]); 
+    close(pipeFileDescriptors[READ_END]);
+    close(pipeFileDescriptors[WRITE_END]);
 }
 
 
 
 //md5sum parent.c | cut -d' ' -f 1
 
-void md5sum(int pipefd[2],char* path){
+void md5sum(int pipefd[PIPE_FD_ARR_SIZE],char* path){
         int pid = fork();
         if(pid == CHILD){
-           close(pipefd[0]);     
-           close(1);
-           dup(pipefd[1]);
-           close(pipefd[1]);
+           close(pipefd[READ_END]);
+           close(WRITE_END);
+           dup(pipefd[WRITE_END]);
+           close(pipefd[WRITE_END]);
             char * argv[] = {MD5SUM,"-z", path,NULL}; // -z makes md5sum return a null terminated string instead of a newline terminated string
             char * envp[] = {NULL};
             execve(MD5SUM,argv,envp);

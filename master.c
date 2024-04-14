@@ -18,8 +18,7 @@
 #define MAX_WRITE 256
 #define MAX_CHILDREN 3
 #define MAXFD 16
-#define READ_END 0
-#define WRITE_END 1
+
 
 sem_t accessToShm;
 sem_t empty;
@@ -33,7 +32,7 @@ int main(int argc, char  ** argv){
     }
 
     //  MASTER->SLAVE PIPE CREATION AREA.
-    int MasterSlavePipes [MAX_CHILDREN][2];
+    int masterToSlavePipes [MAX_CHILDREN][PIPE_FD_ARR_SIZE];
     //  Process A keeps the write end open and closes the read end of the pipe. It can only write to process B.
     //  I can gather all pipes in one matrix.
     //  thePipes[n] is the n-th file descriptor array.
@@ -41,7 +40,7 @@ int main(int argc, char  ** argv){
     //  thePipes[n][1] is the write-end of pipe n.
     for(int i = 0; i < MAX_CHILDREN; i++){
         
-        if(pipe(MasterSlavePipes[i]) == ERROR){                                                 
+        if(pipe(masterToSlavePipes[i]) == ERROR){
             exitOnError("PIPE ERROR");
         }
         //  The Pipeline is already created. Now we have to assign read and write -ends.
@@ -49,9 +48,9 @@ int main(int argc, char  ** argv){
     }
     // M->S PIPE CREATION AREA END.
     // SLAVE->MASTER PIPE CREATION AREA.
-    int slaveMasterPipes[MAX_CHILDREN][2];
+    int slaveToMasterPipes[MAX_CHILDREN][PIPE_FD_ARR_SIZE];
     for(int i = 0; i < MAX_CHILDREN; i++){
-        if(pipe(slaveMasterPipes[i]) == ERROR){
+        if(pipe(slaveToMasterPipes[i]) == ERROR){
             exitOnError("Slave to Master pipe creation ERROR");
         }
         //  Esta Pipe se usa desde el Master para leer solamente. No necesito escribir.
@@ -68,14 +67,14 @@ int main(int argc, char  ** argv){
         if (pid == CHILD){                                                                  //AGREGAR CLOSE;DUP;ETC
             //  I am the slave and will jump to slave program.
             pids[i] = pid;
-            close(MasterSlavePipes[i][WRITE_END]);
-            close(slaveMasterPipes[i][READ_END]);
-            close(0);
-            dup(MasterSlavePipes[i][0]);
-            close(MasterSlavePipes[i][0]);
-            close(1);
-            dup(slaveMasterPipes[i][1]);
-            close(slaveMasterPipes[i][1]);
+            close(masterToSlavePipes[i][WRITE_END]);
+            close(slaveToMasterPipes[i][READ_END]);
+            close(READ_END);
+            dup(masterToSlavePipes[i][READ_END]);
+            close(masterToSlavePipes[i][READ_END]);
+            close(WRITE_END);
+            dup(slaveToMasterPipes[i][WRITE_END]);
+            close(slaveToMasterPipes[i][WRITE_END]);
             //  This was the pipe management, slave is "receiving by stdin" and "printing by stdout".
 
             char *args[] = {"./slave", NULL};
@@ -90,22 +89,22 @@ int main(int argc, char  ** argv){
 
             printf("Activado el slave %d\n", pids[i]);
             //  I am the master. I only want to write to the slaves using the first set of pipes. I must close read-end.
-            close(MasterSlavePipes[i][0]);                                                        //DENIFIR MACRO PARA WRITE-READ PIPE END
+            close(masterToSlavePipes[i][READ_END]);                                                        //DENIFIR MACRO PARA WRITE-READ PIPE END
             //  I am the master. I only want to read from the slaves using the second set of pipes. I must close write-end.
-            close(slaveMasterPipes[i][1]);
+            close(slaveToMasterPipes[i][WRITE_END]);
             //  I will now write the FILE PATHS IN ARGV TO THE SLAVES.
            /* int currentSlave = 0;
             for(int j = 1; argv[j] == NULL; j++){                                                       //ARRANCA EN 1 ->agregar verificacion argc > 1
                 if(currentSlave == MAX_CHILDREN){
                     currentSlave = 0;
                 }
-                write(MasterSlavePipes[currentSlave][1], argv[j], MAX_WRITE);
+                write(masterToSlavePipes[currentSlave][1], argv[j], MAX_WRITE);
                 currentSlave++;
             }*/
 
            for(int j = 1; argv[pathsProcessed] != NULL && j < MAX_CHILDREN; j++){
                //   Escribo por primera vez un argumento a cada slave.
-               write(MasterSlavePipes[j][1], argv[pathsProcessed], MAX_WRITE);
+               write(masterToSlavePipes[j][WRITE_END], argv[pathsProcessed], MAX_WRITE);
                pathsProcessed++;
            }
             //  For every file path in ARGV, copy it into the current slave's pipe and increment it. If I am going to go out of bounds next loop, return to 0.
@@ -117,7 +116,11 @@ int main(int argc, char  ** argv){
     int resultsReceived = 0; // I want this number to eventually be ARGC - 1.
 
     sem_init(&accessToShm, 1, 1);
-
+    accessToShm = *sem_open("accessToShm", O_CREAT);
+    sem_init(&empty, 1, 1);
+    empty = *sem_open("empty", O_CREAT);
+    sem_init(&full, 1, 1);
+    full = *sem_open("full", O_CREAT);
     char readBuffer[MAXREAD];
 
     char * sharedMem = 0;
@@ -138,7 +141,7 @@ int main(int argc, char  ** argv){
         //  Agregar el FD de lectura a readFs.
         FD_ZERO(&readFs);
        /* for(int i = 0; i < MAX_CHILDREN; i++){
-            FD_SET(slaveMasterPipes[i][0], &readFs);                     //Deberiamos sacar cuando el slave muera -> si no hay errorman
+            FD_SET(slaveToMasterPipes[i][0], &readFs);                     //Deberiamos sacar cuando el slave muera -> si no hay errorman
         }*/
 
         for(int j = 0; j < MAX_CHILDREN; j++) {
@@ -147,7 +150,7 @@ int main(int argc, char  ** argv){
             if (return_pid == -1) {
                 exitOnError("Wait error on second+ write\n");
             } else if (return_pid == 0) {
-                FD_SET(slaveMasterPipes[j][READ_END], &readFs);
+                FD_SET(slaveToMasterPipes[j][READ_END], &readFs);
             }
         }
 
@@ -158,7 +161,7 @@ int main(int argc, char  ** argv){
         FDsAvailableForReading = select(MAXFD, &readFs, NULL, NULL, NULL);
         if(FDsAvailableForReading > 0){                               //Deberiamos leer apenas hay info -> rescatar que fd esta ready
             for(int i = 0; i < MAX_CHILDREN && FDsAvailableForReading != 0; i++){
-                if(read(slaveMasterPipes[i][0], readBuffer, MAXREAD) != 0){
+                if(read(slaveToMasterPipes[i][READ_END], readBuffer, MAXREAD) != 0){
                     FDsAvailableForReading--;
                     resultsReceived++;
 
@@ -171,7 +174,7 @@ int main(int argc, char  ** argv){
                     //  Escribir de vuelta al hijo.
 
                     if(pathsProcessed < argc){
-                        write(MasterSlavePipes[i][WRITE_END], argv[pathsProcessed++], MAX_WRITE);
+                        write(masterToSlavePipes[i][WRITE_END], argv[pathsProcessed++], MAX_WRITE);
                     }
                 }
             }

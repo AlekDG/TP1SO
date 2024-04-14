@@ -9,13 +9,13 @@ utils.o: utils.c
 	$(COMPILER) -c utils.c $(CFLAGS) -o utils.o
 
 master: utils.o master.c
-	$(COMPILER) -c master.c  utils.o $(CFLAGS) -o master
+	$(COMPILER)  master.c  utils.o $(CFLAGS) -o master
 
 view: utils.o view.c
-	$(COMPILER) -c view.c utils.o $(CFLAGS) -o view
+	$(COMPILER)  view.c utils.o $(CFLAGS) -o view
 
 slave:  utils.o slave.c
-	$(COMPILER) -c slave.c utils.o $(CFLAGS) -o slave
+	$(COMPILER)  slave.c utils.o $(CFLAGS) -o slave
 
 debug: CFLAGS=$(DEBUG_COMPILER)
 debug: all
