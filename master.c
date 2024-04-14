@@ -1,18 +1,20 @@
 #include <sys/select.h>
 #include <string.h>
-#include <unistd.h>
 #include <sys/wait.h>
-#include <semaphore.h>
 #include "utils.h"
-#include <sys/mman.h>
 #include <fcntl.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
 
 #define MAXREAD 256
 #define MAX_WRITE 256
 #define MAX_CHILDREN 3
 #define MAXFD 16
+#define RWCREAT (0666 | O_CREAT)
 
-sem_t accessToShm;
+#define SHM_SIZE 1024
+
+sem_t * accessToShm;
 sem_t empty;
 sem_t full;
 
@@ -101,18 +103,26 @@ int main(int argc, char  ** argv){
 
     int resultsReceived = 0;
 
-    sem_init(&accessToShm, 1, 1);
-    accessToShm = *sem_open("accessToShm", O_CREAT);
-    sem_init(&empty, 1, 1);
-    empty = *sem_open("empty", O_CREAT);
-    sem_init(&full, 1, 1);
-    full = *sem_open("full", O_CREAT);
+    if ((accessToShm = sem_open("/accesToShm", O_CREAT | O_EXCL, 0666, 1)) == SEM_FAILED) {
+        perror("sem_open");
+        exit(1);
+    }
+
     char readBuffer[MAXREAD];
 
-    char * sharedMem = 0;
-    int shmFd;
-    if((shmFd =  shm_open(sharedMem, 0666 | O_CREAT, 0)) == ERROR){
-        exitOnError("Shared Memory Creation ERROR");
+    char * sharedMem;
+    int shmID;
+    key_t key;
+    if ((key = ftok(".", 'R')) == -1) {
+        exitOnError("FTOK ERROR\n");
+    }
+
+    if ((shmID = shmget(key, SHM_SIZE, RWCREAT)) == ERROR) {
+        exitOnError("shmget ERROR\n");
+    }
+
+    if ((sharedMem = shmat(shmID, NULL, 0)) == (char *) ERROR) {
+        exitOnError("Shmat ERROR\n");
     }
 
     fd_set readFs;
@@ -139,11 +149,10 @@ int main(int argc, char  ** argv){
                     FDsAvailableForReading--;
                     resultsReceived++;
 
-                    sem_wait(&empty);
+
                     sem_wait(&accessToShm);
-                    write(shmFd, readBuffer, MAX_WRITE);
+                    write(shmID, readBuffer, MAX_WRITE);
                     sem_post(&accessToShm);
-                    sem_post(&full);
 
                     //  Escribir de vuelta al hijo.
 
