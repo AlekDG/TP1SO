@@ -2,6 +2,8 @@
 #define UTILS_H
 #include <stdlib.h>
 #include <stdio.h>
+#include <unistd.h>
+
 
 #define CHILD 0
 #define ERROR -1
