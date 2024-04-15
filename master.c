@@ -8,13 +8,13 @@
 
 #define MAXREAD 256
 #define MAX_WRITE 256
-#define MAX_CHILDREN 3
 #define MAXFD 16
 #define RWCREAT (0666 | O_CREAT)
 #define FINISHED 0
 #define TERMINATED -1
 #define OUTPUT_FILE "./outputFile"
 #define SHM_SIZE 1024
+#define MAX_TASKS 4
 
 sem_t * accessToShm;
 
@@ -23,16 +23,29 @@ int main(int argc, char  ** argv){
     if(argc > 1){
         exitOnError("Wrong number of arguments. Must specify at least one file path.\n");
     }
+    //  Create the SHM with a name and print it to stdout
 
-    int masterToSlavePipes [MAX_CHILDREN][PIPE_FD_ARR_SIZE];
-    for(int i = 0; i < MAX_CHILDREN; i++){
+    //  Create the output file.
+    int outputFileDescriptor = open(OUTPUT_FILE, O_CREAT);
+    if(outputFileDescriptor == ERROR){
+        exitOnError("Output file creation error.\n");
+    }
+    sleep(2);
+
+    //  Decido cuantos numberOfSlaves crear.
+    int numberOfSlaves = 1 + (argc - 1) / MAX_TASKS;
+
+
+
+    int masterToSlavePipes [numberOfSlaves][PIPE_FD_ARR_SIZE];
+    for(int i = 0; i < numberOfSlaves; i++){
         if(pipe(masterToSlavePipes[i]) == ERROR){
             exitOnError("PIPE ERROR");
         }
     }
 
-    int slaveToMasterPipes[MAX_CHILDREN][PIPE_FD_ARR_SIZE];
-    for(int i = 0; i < MAX_CHILDREN; i++){
+    int slaveToMasterPipes[numberOfSlaves][PIPE_FD_ARR_SIZE];
+    for(int i = 0; i < numberOfSlaves; i++){
         if(pipe(slaveToMasterPipes[i]) == ERROR){
             exitOnError("Slave to Master pipe creation ERROR");
         }
@@ -42,9 +55,9 @@ int main(int argc, char  ** argv){
 
 
     printf("Starting Master\n");                                                        
-    int pids[MAX_CHILDREN];
+    int pids[numberOfSlaves];
     int pathsProcessed = 1;
-    for (int i=0; i < MAX_CHILDREN; i++){ 
+    for (int i=0; i < numberOfSlaves; i++){
         pid_t pid = fork();
         if (pid == CHILD){
             pids[i] = pid;
@@ -90,10 +103,10 @@ int main(int argc, char  ** argv){
                 exitOnError("Close Error\n");
             }
 
-           for(int j = 1; argv[pathsProcessed] != NULL && j < MAX_CHILDREN; j++){
+           for(int j = 1; argv[pathsProcessed] != NULL && j < numberOfSlaves; j++){
 
                if(write(masterToSlavePipes[j][WRITE_END], argv[pathsProcessed], MAX_WRITE) == ERROR){
-                   exitOnError("Failed to write to slaves for the first time\n");
+                   exitOnError("Failed to write to numberOfSlaves for the first time\n");
                }
                pathsProcessed++;
            }
@@ -127,33 +140,20 @@ int main(int argc, char  ** argv){
     fd_set readFs;
     int FDsAvailableForReading;
 
-    //  Create the output file.
-    int outputFileDescriptor = open(OUTPUT_FILE, O_CREAT);
-    if(outputFileDescriptor == ERROR){
-        exitOnError("Output file creation error.\n");
-    }
+
 
     while(resultsReceived != argc -1){
-
         FD_ZERO(&readFs);
-
-        for(int j = 0; j < MAX_CHILDREN; j++) {
-            int status;
-          /*  pid_t return_pid = waitpid(pids[j], &status, WNOHANG);
-            if (return_pid == ERROR) {
-                exitOnError("Wait error on second+ write\n");
-            } else if (return_pid == 0) {
-                FD_SET(slaveToMasterPipes[j][READ_END], &readFs);
-            }*/
+        for(int j = 0; j < numberOfSlaves; j++) {
             if(pids[j] != TERMINATED){
                 FD_SET(slaveToMasterPipes[j][READ_END], &readFs);
             }
         }
 
-        int readCheck;
+        ssize_t readCheck;
         FDsAvailableForReading = select(MAXFD, &readFs, NULL, NULL, NULL);
         if(FDsAvailableForReading > 0){
-            for(int i = 0; i < MAX_CHILDREN && FDsAvailableForReading != 0; i++){
+            for(int i = 0; i < numberOfSlaves && FDsAvailableForReading != 0; i++){
                 if((readCheck = read(slaveToMasterPipes[i][READ_END], readBuffer, MAXREAD)) > 0) {
                     FDsAvailableForReading--;
                     resultsReceived++;
@@ -186,10 +186,11 @@ int main(int argc, char  ** argv){
     if(close(outputFileDescriptor) == ERROR){
         exitOnError("Error on closing the output file\n");
     }
-    for(int i = 0; i < MAX_CHILDREN; i++){
+    for(int i = 0; i < numberOfSlaves; i++){
         if(waitpid(pids[i], NULL, WUNTRACED) == -1){
             exitOnError("Final wait error\n");
         }
         printf("Desactivado el slave %d\n", pids[i]);
     }
+    exit(0);
 }
