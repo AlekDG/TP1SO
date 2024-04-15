@@ -28,7 +28,8 @@ void createSlave(int i,int masterToSlavePipes[][PIPE_FD_ARR_SIZE],int slaveToMas
 void* createSharedMemory(int* shmID);
 int createOutputFile();
 void createPipes(int masterToSlavePipes[][PIPE_FD_ARR_SIZE],int slaveToMasterPipes[][PIPE_FD_ARR_SIZE],int numberOfSlaves);
-
+void createSlaves(int pids[],int numberOfSlaves,int masterToSlavePipes[][PIPE_FD_ARR_SIZE],int slaveToMasterPipes[][PIPE_FD_ARR_SIZE]);
+void createSemaphore();
 
 sem_t * accessToShm;
 
@@ -46,49 +47,25 @@ int main(int argc, char  ** argv){
     int outputFile = createOutputFile();
     puts(SHM_NAME);
     //sleep(2);
+    createSemaphore();
 
-    if ((accessToShm = sem_open("sem.accesToShm", O_CREAT ,S_IRWXU,1)) == SEM_FAILED) {
-        exitOnError("Sem Open Error\n");
-    }
-
-    //  Decido cuantos numberOfSlaves crear.
     int numberOfSlaves = NUMBER_OF_SLAVES_FORMULA(argc);
     int masterToSlavePipes [numberOfSlaves][PIPE_FD_ARR_SIZE];
     int slaveToMasterPipes[numberOfSlaves][PIPE_FD_ARR_SIZE];
-    createPipes(masterToSlavePipes,slaveToMasterPipes,numberOfSlaves);                                             
-    int pids[numberOfSlaves];
-    
-    for (int i=0; i < numberOfSlaves; i++){
-        int pid = fork();
-        if (pid == CHILD){
-            createSlave(i,masterToSlavePipes,slaveToMasterPipes);
-        }
-        else if(pid == ERROR) {
-            exitOnError("FORK ERROR\n");
-        }
+    createPipes(masterToSlavePipes,slaveToMasterPipes,numberOfSlaves);
+    int pids[numberOfSlaves];    
+    createSlaves(pids,numberOfSlaves,masterToSlavePipes,slaveToMasterPipes);
 
-        printf("HIJO %d\n",i);    //DEBUG
-
-        pids[i] = pid;
-        if(close(masterToSlavePipes[i][READ_END]) == ERROR){
-            exitOnError("Close Error\n");
-        }
-        if(close(slaveToMasterPipes[i][WRITE_END]) == ERROR){
-            exitOnError("Close Error\n");
-        } 
-
-    } 
-    int pathsProcessed = 1;
-    int j = 1 ;   
-    for(; argv[pathsProcessed] != NULL && j < numberOfSlaves; j++){                // TENEMOS QUE PASARLE UNA CANT X NO TODO
-       if(write(masterToSlavePipes[j][WRITE_END], argv[pathsProcessed], MAX_WRITE) == ERROR){
-           exitOnError("Failed to write to numberOfSlaves for the first time\n");
+    int pathsProcessed = 1;                     //revisar nombre
+     
+    for(int j = 0 ; j < numberOfSlaves; j++){                // TENEMOS QUE PASARLE UNA CANT X NO TODO
+      if(write(masterToSlavePipes[j][WRITE_END], argv[pathsProcessed], MAX_WRITE) == ERROR){
+           exitOnError("Failed to write on pipe \n");
        }
         printf("PASE WRITE %s\n",argv[pathsProcessed]);    //DEBUG
        pathsProcessed++;
        
     }
-    printf("%s",argv[j]);  //DEBUG
 
     int resultsReceived = 0;
 
@@ -100,7 +77,7 @@ int main(int argc, char  ** argv){
 
     while(resultsReceived != argc -1){
         int maxFd = createFdSet(&readFs,numberOfSlaves,pids,slaveToMasterPipes);
-    printf("CREELOS FDSET \n");    //DEBUG 
+        printf("CREELOS FDSET \n");    //DEBUG 
         ssize_t readCheck;
         FDsAvailableForReading = select(maxFd, &readFs, NULL, NULL, NULL);
 
@@ -125,7 +102,7 @@ int main(int argc, char  ** argv){
                 }
             }
         }
-        else if (FDsAvailableForReading == ERROR){
+        else{
             exitOnError("Pselect error\n");
         }
     }
@@ -167,7 +144,7 @@ void writeOnSHM(void* shm,char* readBuffer,int shmID){
 }
 
 void createSlave(int i,int masterToSlavePipes[][PIPE_FD_ARR_SIZE],int slaveToMasterPipes[][PIPE_FD_ARR_SIZE]){
-    if(close(masterToSlavePipes[i][WRITE_END]) == ERROR){
+   if(close(masterToSlavePipes[i][WRITE_END]) == ERROR){
      exitOnError("Close Error\n");
     }
     if(close(slaveToMasterPipes[i][READ_END]) == ERROR){
@@ -179,7 +156,7 @@ void createSlave(int i,int masterToSlavePipes[][PIPE_FD_ARR_SIZE],int slaveToMas
     if(dup(masterToSlavePipes[i][READ_END]) == ERROR){
         exitOnError("Dup Error\n");
     }
-    if(close(masterToSlavePipes[i][READ_END]) == ERROR){
+   if(close(masterToSlavePipes[i][READ_END]) == ERROR){
         exitOnError("Close Error\n");
     }
     if(close(WRITE_END) == ERROR){
@@ -232,3 +209,31 @@ int createOutputFile(){
         }
     }
  }
+void createSlaves(int pids[],int numberOfSlaves,int masterToSlavePipes[][PIPE_FD_ARR_SIZE],int slaveToMasterPipes[][PIPE_FD_ARR_SIZE]){
+    for (int i=0; i < numberOfSlaves; i++){
+        int pid = fork();
+        if (pid == CHILD){
+            createSlave(i,masterToSlavePipes,slaveToMasterPipes);
+        }
+        else if(pid == ERROR) {
+            exitOnError("FORK ERROR\n");
+        }
+
+        printf("HIJO %d\n",i);    //DEBUG
+
+        pids[i] = pid;
+        if(close(masterToSlavePipes[i][READ_END]) == ERROR){
+            exitOnError("Close Error\n");
+        }
+        if(close(slaveToMasterPipes[i][WRITE_END]) == ERROR){
+            exitOnError("Close Error\n");
+        } 
+
+    } 
+}
+void createSemaphore(){
+    accessToShm = sem_open("sem.accesToShm", O_CREAT ,S_IRWXU,1);
+    if(accessToShm == SEM_FAILED){
+        exitOnError("Sem Open Error\n");
+    }
+}
