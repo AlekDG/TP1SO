@@ -14,15 +14,14 @@ static int myPid;
 
 int main(int argc, char * argv[], char* envp[]){
     myPid = getpid();
-    int ReadPipefd[PIPE_FD_ARR_SIZE];
+    int pipefd[PIPE_FD_ARR_SIZE];
     char* path = NULL;
     size_t len = 0;
     size_t readBytes;
-
     while( (readBytes = getline(&path,&len,stdin)) != EOF){
         if(readBytes == 0) exitOnError("Bad Path");
         path[readBytes-1] = '\0';
-        proccesPath(path,ReadPipefd);
+        proccesPath(path,pipefd);
     }
     if(path != NULL)  free(path);
     exit(0);
