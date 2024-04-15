@@ -55,8 +55,7 @@ int main(int argc, char  ** argv){
     int numberOfSlaves = NUMBER_OF_SLAVES_FORMULA(argc);
     int masterToSlavePipes [numberOfSlaves][PIPE_FD_ARR_SIZE];
     int slaveToMasterPipes[numberOfSlaves][PIPE_FD_ARR_SIZE];
-    createPipes(masterToSlavePipes,slaveToMasterPipes,numberOfSlaves);
-        printf("PIPES CREADOS Y LO ANTERIOR TAMBIEN\n");                                               
+    createPipes(masterToSlavePipes,slaveToMasterPipes,numberOfSlaves);                                             
     int pids[numberOfSlaves];
     
     for (int i=0; i < numberOfSlaves; i++){
@@ -67,29 +66,29 @@ int main(int argc, char  ** argv){
         else if(pid == ERROR) {
             exitOnError("FORK ERROR\n");
         }
-        printf("HIJO %d\n",i);   
+
+        printf("HIJO %d\n",i);    //DEBUG
+
         pids[i] = pid;
         if(close(masterToSlavePipes[i][READ_END]) == ERROR){
             exitOnError("Close Error\n");
         }
         if(close(slaveToMasterPipes[i][WRITE_END]) == ERROR){
             exitOnError("Close Error\n");
-        }
-        printf("TEMINO CREAR HIJO ALGO\n");   
+        } 
 
     } 
     int pathsProcessed = 1;
-    int j = 1 ;
-    printf("WRITEE:\n");   
+    int j = 1 ;   
     for(; argv[pathsProcessed] != NULL && j < numberOfSlaves; j++){                // TENEMOS QUE PASARLE UNA CANT X NO TODO
        if(write(masterToSlavePipes[j][WRITE_END], argv[pathsProcessed], MAX_WRITE) == ERROR){
            exitOnError("Failed to write to numberOfSlaves for the first time\n");
        }
-        printf("PASE WRITE\n");   
+        printf("PASE WRITE %s\n",argv[pathsProcessed]);    //DEBUG
        pathsProcessed++;
        
     }
-    printf("%s",argv[j]);
+    printf("%s",argv[j]);  //DEBUG
 
     int resultsReceived = 0;
 
@@ -100,9 +99,8 @@ int main(int argc, char  ** argv){
     int FDsAvailableForReading;
 
     while(resultsReceived != argc -1){
-        printf("WHILE\n");   
         int maxFd = createFdSet(&readFs,numberOfSlaves,pids,slaveToMasterPipes);
-printf("CREELOS FDSET \n");   
+    printf("CREELOS FDSET \n");    //DEBUG 
         ssize_t readCheck;
         FDsAvailableForReading = select(maxFd, &readFs, NULL, NULL, NULL);
 
