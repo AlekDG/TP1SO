@@ -20,7 +20,7 @@ sem_t * accessToShm;
 
 int main(int argc, char  ** argv){
 
-    if(argc != 1){
+    if(argc > 1){
         exitOnError("Wrong number of arguments. Must specify at least one file path.\n");
     }
 
