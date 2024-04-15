@@ -5,6 +5,9 @@
 #include <fcntl.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
+#include <sys/mman.h>
+#include <sys/stat.h>        /* For mode constants */
+#include <fcntl.h>           /* For O_* constants */
 
 #define MAXREAD 256
 #define MAX_WRITE 256
@@ -15,6 +18,8 @@
 #define OUTPUT_FILE "./outputFile"
 #define SHM_SIZE 1024
 #define MAX_TASKS 4
+#define SHM_NAME "/sharedMemory"
+#define SHM_MODE 0600
 
 sem_t * accessToShm;
 
@@ -24,6 +29,17 @@ int main(int argc, char  ** argv){
         exitOnError("Wrong number of arguments. Must specify at least one file path.\n");
     }
     //  Create the SHM with a name and print it to stdout
+    int shmID =  shm_open(SHM_NAME, RWCREAT, SHM_MODE);
+    if(shmID == ERROR){
+        exitOnError("Shm Open Error\n");
+    }
+    if(ftruncate(shmID, SHM_SIZE) == ERROR){
+        exitOnError("Ftruncate error\n");
+    }
+    void * shm = mmap(NULL, SHM_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, shmID, 0);
+    if( shm == (void *) ERROR){
+        exitOnError("mmap error\n");
+    }
 
     //  Create the output file.
     int outputFileDescriptor = open(OUTPUT_FILE, O_CREAT);
@@ -121,26 +137,8 @@ int main(int argc, char  ** argv){
     }
 
     char readBuffer[MAXREAD];
-
-    char * sharedMem;
-    int shmID;
-    key_t key;
-    if ((key = ftok(".", 'R')) == -1) {
-        exitOnError("FTOK ERROR\n");
-    }
-
-    if ((shmID = shmget(key, SHM_SIZE, RWCREAT)) == ERROR) {
-        exitOnError("shmget ERROR\n");
-    }
-
-    if ((sharedMem = shmat(shmID, NULL, 0)) == (char *) ERROR) {
-        exitOnError("Shmat ERROR\n");
-    }
-
     fd_set readFs;
     int FDsAvailableForReading;
-
-
 
     while(resultsReceived != argc -1){
         FD_ZERO(&readFs);
@@ -158,13 +156,10 @@ int main(int argc, char  ** argv){
                     FDsAvailableForReading--;
                     resultsReceived++;
 
-
                     sem_wait(accessToShm);
-                    write(shmID, readBuffer, MAX_WRITE);
+                    shm += write(shmID, readBuffer, MAX_WRITE);
                     sem_post(accessToShm);
-                    //  Write a un archivo
                     write(outputFileDescriptor, readBuffer, MAX_WRITE);
-                    //  Escribir de vuelta al hijo.
 
                     if (pathsProcessed < argc) {
                         write(masterToSlavePipes[i][WRITE_END], argv[pathsProcessed++], MAX_WRITE);
@@ -186,6 +181,11 @@ int main(int argc, char  ** argv){
     if(close(outputFileDescriptor) == ERROR){
         exitOnError("Error on closing the output file\n");
     }
+
+    munmap(shm, SHM_SIZE);
+    unlink(SHM_NAME);
+    close(shmID);
+
     for(int i = 0; i < numberOfSlaves; i++){
         if(waitpid(pids[i], NULL, WUNTRACED) == -1){
             exitOnError("Final wait error\n");
