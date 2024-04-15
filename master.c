@@ -77,8 +77,7 @@ int main(int argc, char  ** argv){
         }
         printf("TEMINO CREAR HIJO ALGO\n");   
 
-    }
-    printf("FIN HIJOS DE MIERDA\n");   
+    } 
     int pathsProcessed = 1;
     int j = 1 ;
     printf("WRITEE:\n");   
