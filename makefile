@@ -12,7 +12,7 @@ master: utils.o master.c
 	$(COMPILER)  master.c  utils.o $(CFLAGS) -o master
 
 view: utils.o view.c
-	$(COMPILER) view.c utils.o $(CFLAGS) -o view
+	$(COMPILER)  view.c utils.o $(CFLAGS) -o view
 
 slave:  utils.o slave.c
 	$(COMPILER)  slave.c utils.o $(CFLAGS) -o slave
