@@ -60,7 +60,6 @@ int main(int argc, char **argv) {
     int path = 1;
     for (int slave = 0; slave < numberOfSlaves; slave++) {
         sprintf(pathBuf, "%s\n", argv[path++]);
-        printf("%s", pathBuf);
         write(masterToSlavePipes[slave][WRITE_END], pathBuf, strlen(pathBuf));
     }
     int pathsSends = numberOfSlaves;
@@ -69,15 +68,12 @@ int main(int argc, char **argv) {
     int pathsToProcess = argc - 1;
     while (pathsSends < pathsToProcess) {
         int maxFd = createFdSet(&readFs, numberOfSlaves, pids, slaveToMasterPipes);
-        printf("ANTES DE SELECT\n");
         select(maxFd, &readFs, NULL, NULL, NULL);
-        printf("despues DE SELECT\n");
         for (int slave = 0; slave < numberOfSlaves; slave++) {
             if (FD_ISSET(slaveToMasterPipes[slave][READ_END], &readFs)) {
                 char readBuffer[MAX_READ];
                 readBuffer[read(slaveToMasterPipes[slave][READ_END], readBuffer, MAX_READ)] = '\0';
                 write(outputFile, readBuffer, strlen(readBuffer));
-                printf("%s\n", readBuffer);
                 //writeOnSHM(shm);
                 sprintf(pathBuf, "%s\n", argv[path++]);
                 pathsSends++;
@@ -95,16 +91,13 @@ int main(int argc, char **argv) {
     int finishedSlaves = 0;
     while (finishedSlaves < numberOfSlaves) {
         int maxFd = createFdSet(&readFs, numberOfSlaves, pids, slaveToMasterPipes);
-        printf("ANTES DE SELECTultimos\n");
         select(maxFd, &readFs, NULL, NULL, NULL);
-        printf("despues DE SELECultimosT\n");
         for (int slave = 0; slave < numberOfSlaves; slave++) {
             if (FD_ISSET(slaveToMasterPipes[slave][READ_END], &readFs)) {
                 char readBuffer[MAX_READ];
 
                 readBuffer[read(slaveToMasterPipes[slave][READ_END], readBuffer, MAX_READ)] = '\0';
                 write(outputFile, readBuffer, strlen(readBuffer));
-                printf("%s\n", readBuffer);
                 //writeOnSHM(shm);
                 pathsProccesed++;
                 finishedSlaves++;
@@ -209,8 +202,6 @@ void createSlaves(int pids[], int numberOfSlaves, int masterToSlavePipes[][PIPE_
         } else if (pid == ERROR) {
             exitOnError("FORK ERROR\n");
         }
-
-        printf("HIJO %d\n", i);    //DEBUG
 
         pids[i] = pid;
         if (close(masterToSlavePipes[i][READ_END]) == ERROR) {
