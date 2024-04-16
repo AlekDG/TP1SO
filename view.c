@@ -1,11 +1,12 @@
 #include "utils.h"
 #include <unistd.h>
 
+
 #define BUFF_SIZE 128
 
 int getMemoryAddress(char* pname, char* buffer);
 void writeOutput(memADT mem);
-int connctToApp(char* buffer);
+int connectToApp(char* buffer);
 
 int main(int argc, char* argv[]){
     char* appOutput;

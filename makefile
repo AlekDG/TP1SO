@@ -16,7 +16,7 @@ view: utils.o view.c
 	$(COMPILER)  view.c utils.o $(CFLAGS) $(SEM_AND_SHM_FLAGS) -o view
 
 slave:  utils.o slave.c
-	$(COMPILER)  slave.c utils.o $(CFLAGS) -o slave
+	$(COMPILER)  slave.c utils.o $(CFLAGS) $(SEM_AND_SHM_FLAGS) -o slave
 
 debug: CFLAGS=$(DEBUG_COMPILER)
 debug: all

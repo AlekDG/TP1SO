@@ -9,6 +9,7 @@
 #include <sys/stat.h>        /* For mode constants */
 #include <fcntl.h>           /* For O_* constants */
 
+
 #define MAXREAD 256
 #define MAX_WRITE 256
 #define FINISHED 0
@@ -92,11 +93,6 @@ int main(int argc, char  ** argv){
         close(masterToSlavePipes[slave++][WRITE_END]);
     }
 //me quedo esperando a leer lo que queda
-    slave = 0;
-    while(slave < numberOfSlaves){
-        close(slaveToMasterPipes[slave++][READ_END]);
-    }
-    
     int finishedSlaves = 0;
     while(finishedSlaves < numberOfSlaves){
         int maxFd = createFdSet(&readFs,numberOfSlaves,pids,slaveToMasterPipes);
@@ -114,6 +110,7 @@ int main(int argc, char  ** argv){
                 pathsProccesed++;
                 finishedSlaves++;
                 pids[slave] = -1;
+                close(slaveToMasterPipes[slave++][READ_END]);
             }
         }
     }
@@ -121,7 +118,8 @@ int main(int argc, char  ** argv){
 	write(outputFile,"\0",1);
     close(outputFile);                             
     munmap(shm, SHM_SIZE);
-    unlink(SHM_NAME);
+    sem_close(accessToShm);
+    sem_unlink(SHM_NAME);
 
     exit(0);
 }
@@ -230,3 +228,4 @@ void createSemaphore(){
     if(accessToShm == SEM_FAILED){
         exitOnError("Sem Open Error\n");
     }
+}
