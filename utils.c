@@ -64,7 +64,7 @@ memADT openExistingMemory(char *id) {
 }
 
 void writeToSHM(memADT m,char* data){
-    if m==NULL
+    if (m==NULL)
         exitOnError("bad memory");
     int length=strlen(data);
     if(length<MEM_SIZE)
