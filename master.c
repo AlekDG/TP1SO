@@ -42,8 +42,8 @@ int main(int argc, char **argv) {
 
     memADT shm = createSharedMemory();
     int outputFile = createOutputFile();
-    puts(SHM_NAME);
-    //sleep(2);
+    printf("%s\n",getMemoryID(shm));
+    sleep(2);
     createSemaphore();
 
     int numberOfSlaves = NUMBER_OF_SLAVES_FORMULA(argc);
@@ -72,7 +72,7 @@ int main(int argc, char **argv) {
                 char readBuffer[MAX_READ];
                 readBuffer[read(slaveToMasterPipes[slave][READ_END], readBuffer, MAX_READ)] = '\0';
                 write(outputFile, readBuffer, strlen(readBuffer));
-                writeOnSHM(shm,readBuffer);
+                writeToSHM(shm,readBuffer);
                 sprintf(pathBuf, "%s\n", argv[path++]);
                 pathsSends++;
                 write(masterToSlavePipes[slave][WRITE_END], pathBuf, strlen(pathBuf));
@@ -96,7 +96,7 @@ int main(int argc, char **argv) {
 
                 readBuffer[read(slaveToMasterPipes[slave][READ_END], readBuffer, MAX_READ)] = '\0';
                 write(outputFile, readBuffer, strlen(readBuffer));
-                writeOnSHM(shm,readBuffer);
+                writeToSHM(shm,readBuffer);
                 pathsProccesed++;
                 finishedSlaves++;
                 pids[slave] = -1;
