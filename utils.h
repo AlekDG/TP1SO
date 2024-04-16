@@ -2,9 +2,9 @@
 #define UTILS_H
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <unistd.h>
 #include <semaphore.h>
-#include <bits/semaphore.h>
 
 
 #define CHILD 0
