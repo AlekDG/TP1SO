@@ -4,7 +4,7 @@
 #include "utils.h"
 
 
-#define MD5SUM "./md5sum"
+#define MD5SUM "/usr/bin/md5sum"
 #define MAXBUF 33
 #define STDIN 0
 
@@ -13,7 +13,7 @@ void proccesPath(char* path,int* pipeFileDescriptors);
 static int myPid;
 
 int main(int argc, char * argv[], char* envp[]){
-    setlinebuff(stdin);
+    // setvbuf(stdin,NULL,_IONBF,0);
     myPid = getpid();
     int pipefd[PIPE_FD_ARR_SIZE];
     char* path = NULL;
@@ -23,6 +23,7 @@ int main(int argc, char * argv[], char* envp[]){
         if(readBytes == 0) exitOnError("Bad Path");
         path[readBytes-1] = '\0';
         proccesPath(path,pipefd);
+        fflush(stdin);
     }
     if(path != NULL)  free(path);
     exit(0);
@@ -39,7 +40,9 @@ void proccesPath(char* path,int* pipeFileDescriptors){
         exitOnError("Read error in slave\n");
     }
     buf[MAXBUF-1] = '\0';
-    printf("File: %s - md5: %s - Processed by: %d\n",path,buf,myPid);
+    char writeBuf[256];
+    sprintf(writeBuf,"File: %s - md5: %s - Processed by: %d\n",path,buf,myPid);
+    write(1,writeBuf,strlen(writeBuf)+1);
     free(buf);   
     close(pipeFileDescriptors[READ_END]);
     close(pipeFileDescriptors[WRITE_END]);
@@ -67,4 +70,5 @@ void md5sum(int pipefd[PIPE_FD_ARR_SIZE],char* path){
         }
         if(pid == ERROR) exitOnError("FORK ERROR\n");
 }
+
 
