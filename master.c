@@ -56,18 +56,19 @@ int main(int argc, char  ** argv){
     int pids[numberOfSlaves];    
     createSlaves(pids,numberOfSlaves,masterToSlavePipes,slaveToMasterPipes);
 
-    int pathsProcessed = 1;                     //revisar nombre
+
+    int pathsProcessed = 1;                     
      
     for(int j = 0 ; j < numberOfSlaves; j++){                // TENEMOS QUE PASARLE UNA CANT X NO TODO
+      //dprintf(masterToSlavePipes[j][WRITE_END],"%s\n",argv[pathsProcessed]);
       if(write(masterToSlavePipes[j][WRITE_END], argv[pathsProcessed], MAX_WRITE) == ERROR){
            exitOnError("Failed to write on pipe \n");
        }
-        printf("PASE WRITE %s\n",argv[pathsProcessed]);    //DEBUG
        pathsProcessed++;
        
     }
 
-    int resultsReceived = 0;
+    int resultsReceived = numberOfSlaves;
 
   
 
@@ -75,37 +76,50 @@ int main(int argc, char  ** argv){
     fd_set readFs;
     int FDsAvailableForReading;
 
-    while(resultsReceived != argc -1){
+    while(resultsReceived <= argc -1){
         int maxFd = createFdSet(&readFs,numberOfSlaves,pids,slaveToMasterPipes);
         printf("CREELOS FDSET \n");    //DEBUG 
         ssize_t readCheck;
         FDsAvailableForReading = select(maxFd, &readFs, NULL, NULL, NULL);
+        printf("select");
 
         if(FDsAvailableForReading > 0){
             for(int i = 0; i < numberOfSlaves && FDsAvailableForReading != 0; i++){
-                if((readCheck = read(slaveToMasterPipes[i][READ_END], readBuffer, MAXREAD)) > 0) {
-                    FDsAvailableForReading--;
-                    resultsReceived++;
+                if(FD_ISSET(slaveToMasterPipes[i][READ_END],&readFs)){
+                    if((readCheck = read(slaveToMasterPipes[i][READ_END], readBuffer, MAXREAD)) > 0) {
+                        FDsAvailableForReading--;
+                        resultsReceived++;
+                        printf("%s \n",readBuffer);
+                        write(outputFile, readBuffer, MAX_WRITE); 
+                        writeOnSHM(shm,readBuffer,shmID);
+                                               
 
-                    writeOnSHM(shm,readBuffer,shmID);
-                    write(outputFile, readBuffer, MAX_WRITE);                           
+                        if (pathsProcessed < argc) {
+                            write(masterToSlavePipes[i][WRITE_END], argv[pathsProcessed++], MAX_WRITE);
+                        }else{
+                            pids[i] = TERMINATED;
+                            close(slaveToMasterPipes[i][READ_END]);
+                            close(masterToSlavePipes[i][WRITE_END]);
+                        }
+                    }else if (readCheck == FINISHED){
+                        pids[i] = TERMINATED;
+                        close(slaveToMasterPipes[i][READ_END]);
+                        close(masterToSlavePipes[i][WRITE_END]);
 
-                    if (pathsProcessed < argc) {
-                        write(masterToSlavePipes[i][WRITE_END], argv[pathsProcessed++], MAX_WRITE);
-                    }
+                    }else{
+                        exitOnError("Failed to read from children\n");
+                        }
+                
+             
                 }
-                else if (readCheck == FINISHED){
-                    pids[i] = TERMINATED;
-                }
-                else{
-                    exitOnError("Failed to read from children\n");
-                }
+                
             }
         }
         else{
             exitOnError("Pselect error\n");
         }
     }
+    
 
     close(outputFile);                             
     munmap(shm, SHM_SIZE);
@@ -133,7 +147,7 @@ int createFdSet(fd_set* readFs, int numberOfSlaves,int* pids,int slaveToMasterPi
                 maxFd = slaveToMasterPipes[j][READ_END];
             }
         }
-        return maxFd;
+        return maxFd + 1;
 }
 
 void writeOnSHM(void* shm,char* readBuffer,int shmID){
@@ -166,8 +180,9 @@ void createSlave(int i,int masterToSlavePipes[][PIPE_FD_ARR_SIZE],int slaveToMas
         exitOnError("Dup Error\n");
     }
     if(close(slaveToMasterPipes[i][WRITE_END]) == ERROR){
-        exitOnError("Close Error\n");}
-    
+        exitOnError("Close Error\n");
+    } 
+ 
     char *args[] = {"./slave", NULL};
     execve(args[0], args, NULL);
     exitOnError("Could not exec slave program. Will now exit.\n");

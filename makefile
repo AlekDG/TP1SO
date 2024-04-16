@@ -21,5 +21,8 @@ slave:  utils.o slave.c
 debug: CFLAGS=$(DEBUG_COMPILER)
 debug: all
 
+cout:
+	rm outputFile.txt
+
 clean:
 	rm -r  utils.o slave view master

@@ -18,7 +18,7 @@ int main(int argc, char * argv[], char* envp[]){
     char* path = NULL;
     size_t len = 0;
     size_t readBytes;
-    while( (readBytes = getline(&path,&len,stdin)) != EOF){
+    while( (readBytes = getdelim(&path,&len,'\n',stdin)) != EOF){
         if(readBytes == 0) exitOnError("Bad Path");
         path[readBytes-1] = '\0';
         proccesPath(path,pipefd);
