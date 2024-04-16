@@ -2,7 +2,6 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <strings.h>
-#include <bits/mman-linux.h>
 #include <sys/mman.h>
 
 #define PERMS O_CREAT|O_RDWR|O_EXCL
