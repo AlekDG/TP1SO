@@ -1,43 +1,62 @@
 #include "utils.h"
-#include <sys/types.h>
-#include <sys/ipc.h>
-#include <sys/shm.h>
-#include <string.h>
-#include <semaphore.h>
-//#define SHM_SIZE 1024
+#include <unistd.h>
 
-extern sem_t accessToShm;
-extern sem_t empty;
-extern sem_t full;
+#define BUFF_SIZE 128
 
-int main(int argc, char *argv[]) {
-    key_t key = ftok("/tmp", 'A');
-    char* shmid;
-    if(argv[1]!=NULL)
-        shmid = argv[1];
-    else
-        shmid = read(stdin);
-    // Creamos el array de shared memory. Meter en el master
-/*    if ((shmid = shmget(key, SHM_SIZE, 0666 | IPC_CREAT)) == -1) {
-        exitOnError("No se pudo alocar SHM");
-    }
-*/    // Aniadimos los datos al array
-    int fd=shm_open(shmid);
-    //sem_wait(&full);
-    //sem_wait(&accessToShm);
-    if ((info = (char *)shmat(fd, NULL, 0)) == (char *) -1) {
-        exitOnError("No se pudo utilizar SHM");
-    }
-    //sem_post(&accessToShm);
-    //sem_post(&empty);
+int getMemoryAddress(char* pname, char* buffer);
+void writeOutput(memADT mem);
+int connctToApp(char* buffer);
 
-    // Hacemos print de la informacion
-    
-    int printAmount=atoi(argv[2]);
-    for(int i=0;i<printAmount;i++) {
-        printf("%s\n", info);
+int main(int argc, char* argv[]){
+    char* appOutput;
+    if(argc==2){
+        appOutput = argv[1];
+    } else {
+        char aux[BUFF_SIZE];
+        appOutput=aux;
+        if(connectToApp(appOutput)==-1){
+            exitOnError("View could not connect to Master");
+        } 
     }
-    //Desacoplamos el array
-    shmdt(info);
+
+    memADT sharedMem = openExistingMemory(appOutput);
+    if(sharedMem == NULL){
+        exitOnError("Failed to open memory");
+    }
+    writeOutput(sharedMem);
+    unlinkMemory(sharedMem);
     return 0;
+}
+
+int connectToApp(char* buffer){ //TODO: Repasar la funcion de isatty
+        if(!isatty(STDIN_FILENO)){
+            read(STDIN_FILENO,buffer,BUFF_SIZE);
+            return 0;
+        } else {
+            return -1;
+        }
+    }
+
+void writeOutput(memADT mem){
+    char buffer[BUFF_SIZE];
+    char* memMap = getMemoryMap(mem);
+    char* mapPtr = memMap;
+    sem_t* appSem = getMemorySem(mem);
+    int semValue;
+
+    while(1){
+        if(getFlag(mem)==1){
+            if(sem_getvalue(appSem,&semValue)==1){
+                exitOnError("Error de Semaforo");
+            }
+
+            if(semValue == 0){
+                return;
+            }
+        }
+        sem_wait(appSem);
+        strcpy(buffer,mapPtr);
+        printf("%s",buffer);
+        mapPtr+=strlen(buffer)+1;
+    }
 }
