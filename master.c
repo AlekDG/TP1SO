@@ -181,7 +181,7 @@ void createSlave(int i,int masterToSlavePipes[][PIPE_FD_ARR_SIZE],int slaveToMas
 }
 
 int createOutputFile(){
-    int file = open(OUTPUT_FILE, O_CREAT | O_RDWR, S_IRWXU );
+    int file = open(OUTPUT_FILE, O_CREAT | O_RDWR | O_TRUNC, S_IRWXU );
     if(file == ERROR){
         exitOnError("Output file creation error.\n");
     }
