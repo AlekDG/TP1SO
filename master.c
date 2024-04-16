@@ -18,8 +18,6 @@
 
 int createFdSet(fd_set *readFs, int numberOfSlaves, int *pids, int slaveToMasterPipes[][PIPE_FD_ARR_SIZE]);
 
-void writeOnSHM(memADT mem);
-
 void createSlave(int i, int masterToSlavePipes[][PIPE_FD_ARR_SIZE], int slaveToMasterPipes[][PIPE_FD_ARR_SIZE]);
 
 int createOutputFile();
@@ -74,7 +72,7 @@ int main(int argc, char **argv) {
                 char readBuffer[MAX_READ];
                 readBuffer[read(slaveToMasterPipes[slave][READ_END], readBuffer, MAX_READ)] = '\0';
                 write(outputFile, readBuffer, strlen(readBuffer));
-                //writeOnSHM(shm);
+                writeOnSHM(shm,readBuffer);
                 sprintf(pathBuf, "%s\n", argv[path++]);
                 pathsSends++;
                 write(masterToSlavePipes[slave][WRITE_END], pathBuf, strlen(pathBuf));
@@ -98,7 +96,7 @@ int main(int argc, char **argv) {
 
                 readBuffer[read(slaveToMasterPipes[slave][READ_END], readBuffer, MAX_READ)] = '\0';
                 write(outputFile, readBuffer, strlen(readBuffer));
-                //writeOnSHM(shm);
+                writeOnSHM(shm,readBuffer);
                 pathsProccesed++;
                 finishedSlaves++;
                 pids[slave] = -1;
@@ -129,13 +127,6 @@ int createFdSet(fd_set *readFs, int numberOfSlaves, int *pids, int slaveToMaster
         }
     }
     return maxFd + 1;
-}
-
-void writeOnSHM(memADT mem) {
-    sem_wait(accessToShm);
-    write(STDOUT_FILENO, getMemoryID(mem), strlen(getMemoryID(mem)));
-    sem_post(accessToShm);
-
 }
 
 void createSlave(int i, int masterToSlavePipes[][PIPE_FD_ARR_SIZE], int slaveToMasterPipes[][PIPE_FD_ARR_SIZE]) {
