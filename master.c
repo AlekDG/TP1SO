@@ -16,16 +16,15 @@
 #define OUTPUT_FILE "outputFile.txt"
 #define SHM_SIZE 1024
 #define MAX_TASKS 4
-#define SHM_NAME "/sharedMemory"
+#define SHM_NAME "/sharedMemory"	
 #define SHM_MODE 0600
 #define NUMBER_OF_SLAVES_FORMULA(a) (1 + ((a) - 1) / MAX_TASKS )
 
 
 
 int createFdSet(fd_set* readFs, int numberOfSlaves,int* pids,int slaveToMasterPipes[][PIPE_FD_ARR_SIZE]);
-void writeOnSHM(void* shm,char* readBuffer,int shmID);
+void writeOnSHM(memADT mem);
 void createSlave(int i,int masterToSlavePipes[][PIPE_FD_ARR_SIZE],int slaveToMasterPipes[][PIPE_FD_ARR_SIZE]);
-void* createSharedMemory(int* shmID);
 int createOutputFile();
 void createPipes(int masterToSlavePipes[][PIPE_FD_ARR_SIZE],int slaveToMasterPipes[][PIPE_FD_ARR_SIZE],int numberOfSlaves);
 void createSlaves(int pids[],int numberOfSlaves,int masterToSlavePipes[][PIPE_FD_ARR_SIZE],int slaveToMasterPipes[][PIPE_FD_ARR_SIZE]);
@@ -42,8 +41,7 @@ int main(int argc, char  ** argv){
     }
 
 
-    int shmID;
-    void * shm = createSharedMemory(&shmID);
+    memADT shm = createSharedMemory();
     int outputFile = createOutputFile();
     puts(SHM_NAME);
     //sleep(2);
@@ -55,85 +53,80 @@ int main(int argc, char  ** argv){
     createPipes(masterToSlavePipes,slaveToMasterPipes,numberOfSlaves);
     int pids[numberOfSlaves];    
     createSlaves(pids,numberOfSlaves,masterToSlavePipes,slaveToMasterPipes);
-
-
-    int pathsProcessed = 1;                     
-     
-    for(int j = 0 ; j < numberOfSlaves; j++){                // TENEMOS QUE PASARLE UNA CANT X NO TODO
-      //dprintf(masterToSlavePipes[j][WRITE_END],"%s\n",argv[pathsProcessed]);
-      if(write(masterToSlavePipes[j][WRITE_END], argv[pathsProcessed], MAX_WRITE) == ERROR){
-           exitOnError("Failed to write on pipe \n");
-       }
-       pathsProcessed++;
-       
+  char pathBuf[MAX_WRITE];
+    
+   
+    int path = 1;
+    for(int slave = 0 ; slave < numberOfSlaves; slave++){
+        sprintf(pathBuf,"%s\n",argv[path++]);
+        printf("%s",pathBuf);
+        write(masterToSlavePipes[slave][WRITE_END],pathBuf,strlen(pathBuf));
     }
-
-    int resultsReceived = numberOfSlaves;
-
-  
-
-    char readBuffer[MAXREAD];
+    int pathsSends = numberOfSlaves;
+    int pathsProccesed = 0;
     fd_set readFs;
-    int FDsAvailableForReading;
-
-    while(resultsReceived <= argc -1){
+    int pathsToProcess=argc-1;
+    while(pathsSends < pathsToProcess){
         int maxFd = createFdSet(&readFs,numberOfSlaves,pids,slaveToMasterPipes);
-        printf("CREELOS FDSET \n");    //DEBUG 
-        ssize_t readCheck;
-        FDsAvailableForReading = select(maxFd, &readFs, NULL, NULL, NULL);
-        printf("select");
-
-        if(FDsAvailableForReading > 0){
-            for(int i = 0; i < numberOfSlaves && FDsAvailableForReading != 0; i++){
-                if(FD_ISSET(slaveToMasterPipes[i][READ_END],&readFs)){
-                    if((readCheck = read(slaveToMasterPipes[i][READ_END], readBuffer, MAXREAD)) > 0) {
-                        FDsAvailableForReading--;
-                        resultsReceived++;
-                        printf("%s \n",readBuffer);
-                        write(outputFile, readBuffer, MAX_WRITE); 
-                        writeOnSHM(shm,readBuffer,shmID);
-                                               
-
-                        if (pathsProcessed < argc) {
-                            write(masterToSlavePipes[i][WRITE_END], argv[pathsProcessed++], MAX_WRITE);
-                        }else{
-                            pids[i] = TERMINATED;
-                            close(slaveToMasterPipes[i][READ_END]);
-                            close(masterToSlavePipes[i][WRITE_END]);
-                        }
-                    }else if (readCheck == FINISHED){
-                        pids[i] = TERMINATED;
-                        close(slaveToMasterPipes[i][READ_END]);
-                        close(masterToSlavePipes[i][WRITE_END]);
-
-                    }else{
-                        exitOnError("Failed to read from children\n");
-                        }
-                
-             
-                }
-                
+        printf("ANTES DE SELECT\n");
+	select(maxFd, &readFs, NULL, NULL, NULL);
+	printf("despues DE SELECT\n");
+        for(int slave = 0; slave < numberOfSlaves; slave++){
+            if(FD_ISSET(slaveToMasterPipes[slave][READ_END],&readFs)){
+                char readBuffer[MAXREAD];
+                				
+                readBuffer[read(slaveToMasterPipes[slave][READ_END],readBuffer,MAXREAD)] = '\0';
+                write(outputFile,readBuffer,strlen(readBuffer));
+                			printf("%s\n",readBuffer);
+                //writeOnSHM(shm);
+                sprintf(pathBuf,"%s\n",argv[path++]);
+                pathsSends++;
+                write(masterToSlavePipes[slave][WRITE_END],pathBuf,strlen(pathBuf));
+                pathsProccesed++;
             }
         }
-        else{
-            exitOnError("Pselect error\n");
-        }
+    }
+    int slave = 0;
+    while(slave < numberOfSlaves){
+   
+        close(masterToSlavePipes[slave++][WRITE_END]);
+    }
+//me quedo esperando a leer lo que queda
+    slave = 0;
+    while(slave < numberOfSlaves){
+        close(slaveToMasterPipes[slave++][READ_END]);
     }
     
+    int finishedSlaves = 0;
+    while(finishedSlaves < numberOfSlaves){
+        int maxFd = createFdSet(&readFs,numberOfSlaves,pids,slaveToMasterPipes);
+        printf("ANTES DE SELECTultimos\n");
+	select(maxFd, &readFs, NULL, NULL, NULL);
+	printf("despues DE SELECultimosT\n");
+        for(int slave = 0; slave < numberOfSlaves; slave++){
+            if(FD_ISSET(slaveToMasterPipes[slave][READ_END],&readFs)){
+                char readBuffer[MAXREAD];
+                				
+                readBuffer[read(slaveToMasterPipes[slave][READ_END],readBuffer,MAXREAD)] = '\0';
+                write(outputFile,readBuffer,strlen(readBuffer));
+                			printf("%s\n",readBuffer);
+                //writeOnSHM(shm);
+                pathsProccesed++;
+                finishedSlaves++;
+                pids[slave] = -1;
+            }
+        }
+    }
 
+	write(outputFile,"\0",1);
     close(outputFile);                             
     munmap(shm, SHM_SIZE);
     unlink(SHM_NAME);
-    close(shmID);
 
-    for(int i = 0; i < numberOfSlaves; i++){
-        if(waitpid(pids[i], NULL, WUNTRACED) == -1){
-            exitOnError("Final wait error\n");
-        }
-        printf("Desactivado el slave %d\n", pids[i]);
-    }
     exit(0);
 }
+
+	
 
 
 int createFdSet(fd_set* readFs, int numberOfSlaves,int* pids,int slaveToMasterPipes[][PIPE_FD_ARR_SIZE]){
@@ -150,9 +143,9 @@ int createFdSet(fd_set* readFs, int numberOfSlaves,int* pids,int slaveToMasterPi
         return maxFd + 1;
 }
 
-void writeOnSHM(void* shm,char* readBuffer,int shmID){
+void writeOnSHM(memADT mem){
     sem_wait(accessToShm);
-    shm += write(shmID, readBuffer, MAX_WRITE);
+    write(STDOUT_FILENO, getMemoryID(mem), strlen(getMemoryID(mem)));
     sem_post(accessToShm);
 
 }
@@ -184,23 +177,9 @@ void createSlave(int i,int masterToSlavePipes[][PIPE_FD_ARR_SIZE],int slaveToMas
     } 
  
     char *args[] = {"./slave", NULL};
-    execve(args[0], args, NULL);
+    char *evnv[] = { NULL};
+    execve(args[0], args, evnv);
     exitOnError("Could not exec slave program. Will now exit.\n");
-}
-
-void* createSharedMemory(int* shmID){
-    *shmID =  shm_open(SHM_NAME, O_CREAT | O_RDWR, SHM_MODE);
-    if(*shmID == ERROR){
-        exitOnError("Shm Open Error\n");
-    }
-    if(ftruncate(*shmID, SHM_SIZE) == ERROR){
-        exitOnError("Ftruncate error\n");
-    }
-    void * shm = mmap(NULL, SHM_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, *shmID, 0);
-    if( shm == (void *) ERROR){
-        exitOnError("mmap error\n");
-    }
-    return shm;
 }
 
 int createOutputFile(){
@@ -251,4 +230,3 @@ void createSemaphore(){
     if(accessToShm == SEM_FAILED){
         exitOnError("Sem Open Error\n");
     }
-}
