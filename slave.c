@@ -5,69 +5,70 @@
 
 
 #define MD5SUM "/usr/bin/md5sum"
-#define MAXBUF 33
-#define STDIN 0
+#define MD5_SIZE 33
 
-void md5sum(int pipefd[PIPE_FD_ARR_SIZE], char* path);
-void proccesPath(char* path,int* pipeFileDescriptors);
+void md5sum(int pipefd[PIPE_FD_ARR_SIZE], char *path);
+
+void proccesPath(char *path, int *pipeFileDescriptors);
+
 static int myPid;
 
-int main(int argc, char * argv[], char* envp[]){
+int main(int argc, char *argv[], char *envp[]) {
     myPid = getpid();
     int pipefd[PIPE_FD_ARR_SIZE];
-    char* path = NULL;
+    char *path = NULL;
     size_t len = 0;
     size_t readBytes;
-    while( (readBytes = getdelim(&path,&len,'\n',stdin)) != EOF){
-        if(readBytes == 0) exitOnError("Bad Path");
-        path[readBytes-1] = '\0';
-        proccesPath(path,pipefd);
+    while ((readBytes = getdelim(&path, &len, '\n', stdin)) != EOF) {
+        if (readBytes == 0) exitOnError("Bad Path");
+        path[readBytes - 1] = '\0';
+        proccesPath(path, pipefd);
         fflush(stdin);
     }
-    if(path != NULL)  free(path);
+    if (path != NULL) free(path);
     exit(0);
 }
 
-void proccesPath(char* path,int* pipeFileDescriptors){
-    if(pipe(pipeFileDescriptors) == ERROR) exitOnError("PIPE ERROR\n");        
-    md5sum(pipeFileDescriptors,path);                    
-    char *buf = malloc(MAXBUF);
-    if(buf == NULL){
+void proccesPath(char *path, int *pipeFileDescriptors) {
+    if (pipe(pipeFileDescriptors) == ERROR) exitOnError("PIPE ERROR\n");
+    md5sum(pipeFileDescriptors, path);
+    char *buf = malloc(MD5_SIZE);
+    if (buf == NULL) {
         exitOnError("Malloc ERROR\n");
     }
-    if(read(pipeFileDescriptors[READ_END],buf,MAXBUF) == -1){
+    if (read(pipeFileDescriptors[READ_END], buf, MD5_SIZE) == -1) {
         exitOnError("Read error in slave\n");
     }
-    buf[MAXBUF-1] = '\0';
+    buf[MD5_SIZE - 1] = '\0';
     char writeBuf[256];
-    sprintf(writeBuf,"File: %s - md5: %s - Processed by: %d\n",path,buf,myPid);
-    write(1,writeBuf,strlen(writeBuf)+1);
-    free(buf);   
+    sprintf(writeBuf, "File: %s - md5: %s - Processed by: %d\n", path, buf, myPid);
+    write(1, writeBuf, strlen(writeBuf) + 1);
+    free(buf);
     close(pipeFileDescriptors[READ_END]);
     close(pipeFileDescriptors[WRITE_END]);
 }
 
-void md5sum(int pipefd[PIPE_FD_ARR_SIZE],char* path){
-        int pid = fork();
-        if(pid == CHILD){
-           if(close(pipefd[READ_END]) == ERROR){
-               exitOnError("Close Error\n");
-           }
-           if(close(WRITE_END) == ERROR){
-               exitOnError("Close Error\n");
-           }
-           if(dup(pipefd[WRITE_END]) == ERROR){
-               exitOnError("Dup Error\n");
-           }
-           if(close(pipefd[WRITE_END]) == ERROR){
-               exitOnError("Close Error\n");
-           }
-            char * argv[] = {MD5SUM,"-z", path,NULL};
-            char * envp[] = {NULL};
-            execve(MD5SUM,argv,envp);
-            exitOnError("EXEC ERROR\n");  
+void md5sum(int pipefd[PIPE_FD_ARR_SIZE], char *path) {
+    int pid = fork();
+    if (pid == CHILD) {
+        if (close(pipefd[READ_END]) == ERROR) {
+            exitOnError("Close Error\n");
         }
-        if(pid == ERROR) exitOnError("FORK ERROR\n");
+        if (close(WRITE_END) == ERROR) {
+            exitOnError("Close Error\n");
+        }
+        if (dup(pipefd[WRITE_END]) == ERROR) {
+            exitOnError("Dup Error\n");
+        }
+        if (close(pipefd[WRITE_END]) == ERROR) {
+            exitOnError("Close Error\n");
+        }
+        char *argv[] = {MD5SUM, "-z", path, NULL};
+        char *envp[] = {NULL};
+        execve(MD5SUM, argv, envp);
+        exitOnError("EXEC ERROR\n");
+    }
+    if (pid == ERROR) exitOnError("FORK ERROR\n");
 }
 
 

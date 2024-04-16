@@ -7,123 +7,128 @@
 #define PERMS O_CREAT|O_RDWR|O_EXCL
 
 //Prototipos de funciones auxiliares
-int _openMem(char* id,int oflag,mode_t mode);
+int _openMem(char *id, int oflag, mode_t mode);
+
 int _trunMem(int fd);
-void _randomID(char* buffer);
-void _unlinkMem(char* id);
+
+void _randomID(char *buffer);
+
+void _unlinkMem(char *id);
+
 memADT _mapMem(int fd);
 
 
-void exitOnError(char* msg){
+void exitOnError(char *msg) {
     perror(msg);
     exit(1);
 }
 
 //API para control de memoria compartida de alto nivel
 
-memADT createSharedMemory(void){
+memADT createSharedMemory(void) {
     memADT mem;
     char id[ID_SIZE];
     _randomID(id);
 
-    int fd = _openMem(id,PERMS,S_IRUSR|S_IWUSR);
-    if(fd==-1)
+    int fd = _openMem(id, PERMS, S_IRUSR | S_IWUSR);
+    if (fd == -1)
         return NULL;
-    if (_trunMem(fd)==-1){
+    if (_trunMem(fd) == -1) {
         _unlinkMem(id);
         return NULL;
     }
     mem = _mapMem(fd);
-    if(mem==NULL){
+    if (mem == NULL) {
         _unlinkMem(id);
         return NULL;
     }
-    strcpy(mem->fileID,id);
-    if(sem_init(&mem->sem,1,0)==-1){
+    strcpy(mem->fileID, id);
+    if (sem_init(&mem->sem, 1, 0) == -1) {
         _unlinkMem(id);
-        return NULL;    
+        return NULL;
     }
-    mem->flag=0;
+    mem->flag = 0;
     return mem;
 }
 
-memADT openExistingMemory(char*id){
-    int fd = _openMem(id,O_RDWR,S_IRUSR|S_IWUSR);
-    if(fd==-1)
+memADT openExistingMemory(char *id) {
+    int fd = _openMem(id, O_RDWR, S_IRUSR | S_IWUSR);
+    if (fd == -1)
         return NULL;
     memADT mem = _mapMem(fd);
-    if(mem==NULL){
+    if (mem == NULL) {
         _unlinkMem(id);
-        return NULL;  
+        return NULL;
     }
     return mem;
 }
 
-void unlinkMemory(memADT m){
+void unlinkMemory(memADT m) {
     _unlinkMem(m->fileID);
 }
 
-void setFlag(memADT m,int val){
-    m->flag=val;
+void setFlag(memADT m, int val) {
+    m->flag = val;
 }
 
-int getFlag(memADT m){
+int getFlag(memADT m) {
     return m->flag;
 }
 
-sem_t* getMemorySem(memADT m){
+sem_t *getMemorySem(memADT m) {
     return &m->sem;
 }
 
-char* getMemoryMap(memADT m){
+char *getMemoryMap(memADT m) {
     return m->map;
 }
 
-char* getMemoryID(memADT m){
+char *getMemoryID(memADT m) {
     return m->fileID;
 }
 
 //Funciones Auxiliares. Principalmente wrappers con programacion defensiva 
-int _openMem(char* id,int oflag,mode_t mode){
-    if(strlen(id)>ID_SIZE){
+int _openMem(char *id, int oflag, mode_t mode) {
+    if (strlen(id) > ID_SIZE) {
         return -1;
     }
     char aux[ID_SIZE + 1];
-    aux[0]='/';
-    strcpy(aux+1,id);
-    int fd=shm_open(aux,oflag,mode);
-    if(fd==-1)
+    aux[0] = '/';
+    strcpy(aux + 1, id);
+    int fd = shm_open(aux, oflag, mode);
+    if (fd == -1)
         return -1;
     return fd;
 }
-int _trunMem(int fd){
-    if(ftruncate(fd,sizeof(memStruct))==-1)
+
+int _trunMem(int fd) {
+    if (ftruncate(fd, sizeof(memStruct)) == -1)
         return -1;
     return 0;
 }
 
-void _unlinkMem(char* id){
-    char aux[ID_SIZE+1];
+void _unlinkMem(char *id) {
+    char aux[ID_SIZE + 1];
     aux[0] = '/';
-    strcpy(aux+1,id);
+    strcpy(aux + 1, id);
     shm_unlink(id);
 }
 
-memADT _mapMem(int fd){
-    memADT aux = mmap(NULL,sizeof(memStruct),PROT_WRITE,MAP_SHARED,fd,0);
-    if(aux==MAP_FAILED)
+memADT _mapMem(int fd) {
+    memADT aux = mmap(NULL, sizeof(memStruct), PROT_WRITE, MAP_SHARED, fd, 0);
+    if (aux == MAP_FAILED)
         return NULL;
     return aux;
 }
 
-void _randomID(char* buffer){
-    char set[]="QWERTYUIOPASDFGHJKLZXCVBNMqwertyuiopasdfghjklzxcvbnm0123456789";
-    int setSize=strlen(set);
+void _randomID(char *buffer) {
+    char set[] = "QWERTYUIOPASDFGHJKLZXCVBNMqwertyuiopasdfghjklzxcvbnm0123456789";
+    int setSize = strlen(set);
     int indx;
-    int i=0;
-    for(;i<ID_SIZE-1;i++){
-        indx = rand()%setSize;
-        buffer[i]=set[indx];
+    int i = 0;
+    for (; i < ID_SIZE - 1; i++) {
+        indx = rand() % setSize;
+        buffer[i] = set[indx];
     }
-    buffer[i]='\0';
+    buffer[i] = '\0';
 }
