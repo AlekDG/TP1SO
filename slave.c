@@ -13,6 +13,7 @@ void proccesPath(char* path,int* pipeFileDescriptors);
 static int myPid;
 
 int main(int argc, char * argv[], char* envp[]){
+    setlinebuff(stdin);
     myPid = getpid();
     int pipefd[PIPE_FD_ARR_SIZE];
     char* path = NULL;
