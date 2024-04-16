@@ -63,6 +63,17 @@ memADT openExistingMemory(char *id) {
     return mem;
 }
 
+void writeToSHM(memADT m,char* data){
+    if m==NULL
+        exitOnError("bad memory");
+    int length=strlen(data);
+    if(length<MEM_SIZE)
+        strncpy(m->map,data,length);
+    else
+        strncpy(m->map,data,MEM_SIZE);
+    sem_post(&m->sem);
+}
+
 void unlinkMemory(memADT m) {
     _unlinkMem(m->fileID);
 }
