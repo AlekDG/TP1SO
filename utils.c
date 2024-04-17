@@ -27,7 +27,7 @@ void exitOnError(char *msg) {
 //API para control de memoria compartida de alto nivel
 
 memADT createSharedMemory(void) {
-    memADT mem = malloc(5000);
+    memADT mem = malloc(sizeof(memStruct));
     char id[ID_SIZE];
     _randomID(id);
 
@@ -53,7 +53,7 @@ memADT createSharedMemory(void) {
 }
 
 memADT openExistingMemory(char *id) {
-    memADT mem = malloc(5000);
+    memADT mem = malloc(sizeof(memStruct));
     int fd = _openMem(id, O_RDWR, S_IRUSR | S_IWUSR);
     if (fd == -1)
         return NULL;
