@@ -34,10 +34,13 @@ memADT createSharedMemory(void) {
     int fd = _openMem(id, PERMS, S_IRUSR | 0600);
 
     if (fd == -1){
-        return NULL;}
+        free(mem);
+        return NULL;
+    }
 
     if (_trunMem(fd) == -1) {
         _unlinkMem(id);
+        free(mem);
         return NULL;
     }
 
