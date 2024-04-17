@@ -1,8 +1,6 @@
-
 #include <string.h>
 #include <unistd.h>
 #include "utils.h"
-
 
 #define MD5SUM "/usr/bin/md5sum"
 #define MD5_SIZE 33
@@ -25,7 +23,8 @@ int main(int argc, char *argv[], char *envp[]) {
         proccesPath(path, pipefd);
         fflush(stdin);
     }
-    if (path != NULL) free(path);
+    if (path != NULL)
+        free(path);
     exit(0);
 }
 
@@ -70,5 +69,3 @@ void md5sum(int pipefd[PIPE_FD_ARR_SIZE], char *path) {
     }
     if (pid == ERROR) exitOnError("FORK ERROR\n");
 }
-
-
