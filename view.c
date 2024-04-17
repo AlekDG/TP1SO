@@ -19,7 +19,7 @@ int main(int argc, char* argv[]){
             exitOnError("View could not connect to Master");
         } 
     }
-
+	printf("A%sA",appOutput);
     memADT sharedMem = openExistingMemory(appOutput);
     if(sharedMem == NULL){
         exitOnError("Failed to open memory");
@@ -29,7 +29,7 @@ int main(int argc, char* argv[]){
     return 0;
 }
 
-int connectToApp(char* buffer){ //TODO: Repasar la funcion de isatty
+int connectToApp(char* buffer){
         if(!isatty(STDIN_FILENO)){
             read(STDIN_FILENO,buffer,BUFF_SIZE);
             return 0;
