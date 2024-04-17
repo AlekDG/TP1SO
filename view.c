@@ -17,12 +17,10 @@ int main(int argc, char* argv[]){
     size_t length=0;
     if(argc==2){
         appOutput = argv[1];
-        printf("arg %s\n",appOutput);
     } else {
         ssize_t len = getline(&appOutput,&length,stdin);
         if(appOutput[len-1]=='\n')
             appOutput[len-1]='\0';
-        printf("%s",appOutput);
     }
 
     memADT sharedMem = openExistingMemory(appOutput);
@@ -49,13 +47,7 @@ void writeOutput(memADT mem){
     int st = 1;
 
     while(st){
-     
-        int val;
-        sem_getvalue(full,&val);
-        printf("full %d\n",val);
         sem_wait(full);
-        sem_getvalue(critcalRegion,&val);
-        printf("cr %d\n",val);
         
         sem_wait(critcalRegion);
         int i = 0;
