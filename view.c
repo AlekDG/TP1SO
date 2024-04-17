@@ -27,9 +27,7 @@ int main(int argc, char* argv[]){
     critcalRegion = sem_open(CRITICAL_REGION_SEM,O_RDWR);
     empty = sem_open(EMPTY_SEM,O_RDWR);
     full = sem_open(FULL_SEM,O_RDWR);
-    puts("PASO shm");
     if(sharedMem == NULL){
-        puts("PASO null");
         exitOnError("Failed to open memory");
     }
     writeOutput(sharedMem);
