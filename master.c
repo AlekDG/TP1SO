@@ -28,23 +28,14 @@ sem_t *shmSem;
     sem_t* full ;
 
 int main(int argc, char **argv) {
-    sem_unlink(CRITICAL_REGION_SEM);
-    sem_unlink(EMPTY_SEM);
-    sem_unlink(FULL_SEM);
-
     if (argc < 2) {
         exitOnError("Wrong number of arguments. Must specify at least one file path.\n");
     }
 
-    memADT shm = createSharedMemory();
-    int outputFile = createOutputFile();
-    printf("%s\n",getMemoryID(shm));
-
     critcalRegion = sem_open(CRITICAL_REGION_SEM,O_CREAT,0666,1);
     empty = sem_open(EMPTY_SEM,O_CREAT,0666,50);
     full = sem_open(FULL_SEM,O_CREAT,0666,0);
-    sleep(3);
-
+    
     int numberOfSlaves = NUMBER_OF_SLAVES_FORMULA(argc);
     int masterToSlavePipes[numberOfSlaves][PIPE_FD_ARR_SIZE];
     int slaveToMasterPipes[numberOfSlaves][PIPE_FD_ARR_SIZE];
@@ -52,6 +43,12 @@ int main(int argc, char **argv) {
     int pids[numberOfSlaves];
     createSlaves(pids, numberOfSlaves, masterToSlavePipes, slaveToMasterPipes);
     char pathBuf[MAX_WRITE];
+
+    memADT shm = createSharedMemory();
+    int outputFile = createOutputFile();
+    printf("%s\n",getMemoryID(shm));
+    fflush(stdout);
+    sleep(3);
 
     int path = 1;
     for (int slave = 0; slave < numberOfSlaves; slave++) {
@@ -110,7 +107,7 @@ int main(int argc, char **argv) {
 
     write(outputFile, "\0", 1);
     close(outputFile);
-    munmap(shm, SHM_SIZE);
+    //munmap(shm, SHM_SIZE);
 
     //Notificamos al proceso view de que ya no se escribira mas a la SHM
     char buf[] = {STOP,'\n','\0'};
