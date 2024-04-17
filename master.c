@@ -1,10 +1,8 @@
 #include <sys/select.h>
 #include <string.h>
 #include "utils.h"
-
 #include <sys/mman.h>
 #include <sys/stat.h>
-
 
 #define MAX_READ 256
 #define MAX_WRITE 256
@@ -16,19 +14,12 @@
 
 
 int createFdSet(fd_set *readFs, int numberOfSlaves, int *pids, int slaveToMasterPipes[][PIPE_FD_ARR_SIZE]);
-
 void writeOnSHM(memADT mem,char* readBuffer,int len);
-
 void createSlave(int i, int masterToSlavePipes[][PIPE_FD_ARR_SIZE], int slaveToMasterPipes[][PIPE_FD_ARR_SIZE]);
-
 int createOutputFile();
-
-void
-createPipes(int masterToSlavePipes[][PIPE_FD_ARR_SIZE], int slaveToMasterPipes[][PIPE_FD_ARR_SIZE], int numberOfSlaves);
-
+void createPipes(int masterToSlavePipes[][PIPE_FD_ARR_SIZE], int slaveToMasterPipes[][PIPE_FD_ARR_SIZE], int numberOfSlaves);
 void createSlaves(int pids[], int numberOfSlaves, int masterToSlavePipes[][PIPE_FD_ARR_SIZE],
                   int slaveToMasterPipes[][PIPE_FD_ARR_SIZE]);
-
 void createSemaphore();
 
 sem_t *shmSem;
@@ -36,28 +27,23 @@ sem_t *shmSem;
     sem_t* empty ;
     sem_t* full ;
 
-
 int main(int argc, char **argv) {
     sem_unlink(CRITICAL_REGION_SEM);
     sem_unlink(EMPTY_SEM);
     sem_unlink(FULL_SEM);
+
     if (argc < 2) {
         exitOnError("Wrong number of arguments. Must specify at least one file path.\n");
     }
 
-
     memADT shm = createSharedMemory();
     int outputFile = createOutputFile();
     printf("%s\n",getMemoryID(shm));
-   // shmSem = getMemorySem(shm);
-  critcalRegion = sem_open(CRITICAL_REGION_SEM,O_CREAT,0666,1);
-  empty = sem_open(EMPTY_SEM,O_CREAT,0666,50);
-  full = sem_open(FULL_SEM,O_CREAT,0666,0);
 
-
+    critcalRegion = sem_open(CRITICAL_REGION_SEM,O_CREAT,0666,1);
+    empty = sem_open(EMPTY_SEM,O_CREAT,0666,50);
+    full = sem_open(FULL_SEM,O_CREAT,0666,0);
     sleep(3);
-
-    //createSemaphore(); //ELIMINAR CON TODO LO DE SEM QUE NO SEA LA IMPL DE ALEJO
 
     int numberOfSlaves = NUMBER_OF_SLAVES_FORMULA(argc);
     int masterToSlavePipes[numberOfSlaves][PIPE_FD_ARR_SIZE];
@@ -67,12 +53,12 @@ int main(int argc, char **argv) {
     createSlaves(pids, numberOfSlaves, masterToSlavePipes, slaveToMasterPipes);
     char pathBuf[MAX_WRITE];
 
-
     int path = 1;
     for (int slave = 0; slave < numberOfSlaves; slave++) {
         sprintf(pathBuf, "%s\n", argv[path++]);
         write(masterToSlavePipes[slave][WRITE_END], pathBuf, strlen(pathBuf));
     }
+    
     int pathsSends = numberOfSlaves;
     int pathsProccesed = 0;
     fd_set readFs;
@@ -94,12 +80,14 @@ int main(int argc, char **argv) {
             }
         }
     }
+    
     int slave = 0;
     while (slave < numberOfSlaves) {
 
         close(masterToSlavePipes[slave++][WRITE_END]);
     }
-//me quedo esperando a leer lo que queda
+    
+    //Esperamos a que terminen los esclavos, se los lee a medida que terminan
     int finishedSlaves = 0;
     while (finishedSlaves < numberOfSlaves) {
         int maxFd = createFdSet(&readFs, numberOfSlaves, pids, slaveToMasterPipes);
@@ -123,19 +111,19 @@ int main(int argc, char **argv) {
     write(outputFile, "\0", 1);
     close(outputFile);
     munmap(shm, SHM_SIZE);
-   // sem_close(accessToShm);
 
+    //Notificamos al proceso view de que ya no se escribira mas a la SHM
     char buf[] = {STOP,'\n','\0'};
-
-   writeOnSHM(shm,buf,3);
+    writeOnSHM(shm,buf,3);
     unlinkMemory(shm);
+    free(shm);
+
     sem_close(critcalRegion);
     sem_close(empty);
     sem_close(full);
     sem_unlink(CRITICAL_REGION_SEM);
     sem_unlink(EMPTY_SEM);
     sem_unlink(FULL_SEM);
-
     exit(0);
 }
 
@@ -157,11 +145,10 @@ int createFdSet(fd_set *readFs, int numberOfSlaves, int *pids, int slaveToMaster
 void writeOnSHM(memADT mem,char* readBuffer, int len) {//agregue el readBuffer
 
     sem_wait(empty);
-   sem_wait(critcalRegion);
-  // printf("IMPRIMO %s\n",readBuffer);
+    sem_wait(critcalRegion);
     strcpy(mem->map,readBuffer);
-   sem_post(critcalRegion);
-   sem_post(full);
+    sem_post(critcalRegion);
+    sem_post(full);
     mem->map += len;
 
 }
@@ -241,10 +228,3 @@ void createSlaves(int pids[], int numberOfSlaves, int masterToSlavePipes[][PIPE_
 
     }
 }
-
-/*void createSemaphore() {
-    accessToShm = sem_open("sem.accesToShm", O_CREAT, S_IRWXU, 1);
-    if (accessToShm == SEM_FAILED) {
-        exitOnError("Sem Open Error\n");
-    }
-}*/
