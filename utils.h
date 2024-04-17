@@ -13,7 +13,7 @@
 #define PIPE_FD_ARR_SIZE 2
 #define READ_END 0
 #define WRITE_END 1
-#define ID_SIZE 256
+#define ID_SIZE 6
 #define MEM_SIZE 1024
 
 void exitOnError(char *msg);
