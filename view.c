@@ -8,56 +8,76 @@ int getMemoryAddress(char* pname, char* buffer);
 void writeOutput(memADT mem);
 int connectToApp(char* buffer);
 
+    sem_t* critcalRegion ;
+    sem_t* empty ;
+    sem_t* full ;
+
 int main(int argc, char* argv[]){
-    char* appOutput;
+    char* appOutput = malloc(ID_SIZE);
     if(argc==2){
         appOutput = argv[1];
+        printf("arg %s\n",appOutput);
     } else {
-        char aux[BUFF_SIZE];
-        appOutput=aux;
-        if(connectToApp(appOutput)==-1){
-            exitOnError("View could not connect to Master");
-        } 
+        read(0,appOutput,ID_SIZE);
+        
     }
 
     memADT sharedMem = openExistingMemory(appOutput);
+    critcalRegion = sem_open(CRITICAL_REGION_SEM,O_RDWR);
+  empty = sem_open(EMPTY_SEM,O_RDWR);
+  full = sem_open(FULL_SEM,O_RDWR);
+    puts("PASO shm");
     if(sharedMem == NULL){
+        puts("PASO null");
         exitOnError("Failed to open memory");
     }
     writeOutput(sharedMem);
     unlinkMemory(sharedMem);
-    return 0;
+        sem_close(critcalRegion);
+    sem_close(empty);
+    sem_close(full);
+    free(appOutput);
+    exit(0);
 }
 
-int connectToApp(char* buffer){ //TODO: Repasar la funcion de isatty
-        if(!isatty(STDIN_FILENO)){
-            read(STDIN_FILENO,buffer,BUFF_SIZE);
-            return 0;
-        } else {
-            return -1;
-        }
-    }
-
 void writeOutput(memADT mem){
-    char buffer[BUFF_SIZE];
+    char buffer[1000] = {0};
     char* memMap = getMemoryMap(mem);
     char* mapPtr = memMap;
-    sem_t* appSem = getMemorySem(mem);
-    int semValue;
+    int st = 1;
 
-    while(1){
-        if(getFlag(mem)==1){
-            if(sem_getvalue(appSem,&semValue)==1){
-                exitOnError("Error de Semaforo");
-            }
+    while(st){
+     
+     int val;
+     sem_getvalue(full,&val);
+        printf("full %d\n",val);
 
-            if(semValue == 0){
-                return;
-            }
+
+        sem_wait(full);
+
+
+         sem_getvalue(critcalRegion,&val);
+        printf("cr %d\n",val);
+
+        
+        sem_wait(critcalRegion);
+        //strcpy(buffer,mapPtr);
+        int i = 0;
+        for(; mapPtr[i]!='\n' && mapPtr[i]!='\0';i++){
+            buffer[i] = mapPtr[i];
         }
-        sem_wait(appSem);
-        strcpy(buffer,mapPtr);
-        printf("%s",buffer);
-        mapPtr+=strlen(buffer)+1;
+        //buffer[i++] = '\n';
+        buffer[i] = '\0';
+        if(*mapPtr != STOP) mapPtr++;
+        if(buffer[0] != STOP){
+            sem_post(critcalRegion);
+            printf("%s\n",buffer);
+        }else{  
+            st = 0 ; 
+            sem_post(critcalRegion);
+        }
+        sem_post(empty);
+        mapPtr+=strlen(buffer);
+
     }
 }

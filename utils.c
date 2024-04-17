@@ -4,7 +4,8 @@
 #include <strings.h>
 #include <sys/mman.h>
 
-#define PERMS O_CREAT|O_RDWR|O_EXCL
+#define PERMS O_CREAT|O_RDWR
+#define MAX_SHM_SIZE 1024
 
 //Prototipos de funciones auxiliares
 int _openMem(char *id, int oflag, mode_t mode);
@@ -15,7 +16,7 @@ void _randomID(char *buffer);
 
 void _unlinkMem(char *id);
 
-memADT _mapMem(int fd);
+void* _mapMem(int fd);
 
 
 void exitOnError(char *msg) {
@@ -26,36 +27,45 @@ void exitOnError(char *msg) {
 //API para control de memoria compartida de alto nivel
 
 memADT createSharedMemory(void) {
-    memADT mem;
+    memADT mem = malloc(5000);
     char id[ID_SIZE];
     _randomID(id);
 
-    int fd = _openMem(id, PERMS, S_IRUSR | S_IWUSR);
-    if (fd == -1)
-        return NULL;
+    int fd = _openMem(id, PERMS, S_IRUSR | 0600);
+
+    if (fd == -1){
+        return NULL;}
+
     if (_trunMem(fd) == -1) {
         _unlinkMem(id);
         return NULL;
     }
-    mem = _mapMem(fd);
+
+    mem->map =  _mapMem(fd);
+ 
     if (mem == NULL) {
         _unlinkMem(id);
         return NULL;
     }
     strcpy(mem->fileID, id);
-    if (sem_init(&mem->sem, 1, 0) == -1) {
+    //mem->critcalRegion = sem_open(CRITICAL_REGION_SEM,O_CREAT,S_IRWXU,1);
+    //mem->empty = sem_open(EMPTY_SEM,O_CREAT,S_IRWXU,50);
+    //mem->full = sem_open(FULL_SEM,O_CREAT,S_IRWXU,0);
+    
+    /*if (sem_init(&mem->sem, 1, 1) == -1) {
         _unlinkMem(id);
         return NULL;
-    }
+    }*/
     mem->flag = 0;
     return mem;
 }
 
 memADT openExistingMemory(char *id) {
+    memADT mem = malloc(5000);              //REVISAR SI SE PUEDE PONER CON SIZEOF
     int fd = _openMem(id, O_RDWR, S_IRUSR | S_IWUSR);
     if (fd == -1)
         return NULL;
-    memADT mem = _mapMem(fd);
+    mem->map = _mapMem(fd);
     if (mem == NULL) {
         _unlinkMem(id);
         return NULL;
@@ -65,6 +75,8 @@ memADT openExistingMemory(char *id) {
 
 void unlinkMemory(memADT m) {
     _unlinkMem(m->fileID);
+    free(m);
+
 }
 
 void setFlag(memADT m, int val) {
@@ -76,7 +88,7 @@ int getFlag(memADT m) {
 }
 
 sem_t *getMemorySem(memADT m) {
-    return &m->sem;
+    return m->critcalRegion;
 }
 
 char *getMemoryMap(memADT m) {
@@ -102,7 +114,7 @@ int _openMem(char *id, int oflag, mode_t mode) {
 }
 
 int _trunMem(int fd) {
-    if (ftruncate(fd, sizeof(memStruct)) == -1)
+    if (ftruncate(fd, MAX_SHM_SIZE) == -1)
         return -1;
     return 0;
 }
@@ -114,8 +126,8 @@ void _unlinkMem(char *id) {
     shm_unlink(id);
 }
 
-memADT _mapMem(int fd) {
-    memADT aux = mmap(NULL, sizeof(memStruct), PROT_WRITE, MAP_SHARED, fd, 0);
+void* _mapMem(int fd) {
+    void* aux = mmap(NULL, MAX_SHM_SIZE, PROT_WRITE, MAP_SHARED, fd, 0);
     if (aux == MAP_FAILED)
         return NULL;
     return aux;

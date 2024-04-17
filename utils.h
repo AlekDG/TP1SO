@@ -6,6 +6,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <semaphore.h>
+#include <fcntl.h>
 
 
 #define CHILD 0
@@ -13,16 +14,22 @@
 #define PIPE_FD_ARR_SIZE 2
 #define READ_END 0
 #define WRITE_END 1
-#define ID_SIZE 256
+#define ID_SIZE 6
 #define MEM_SIZE 1024
+#define CRITICAL_REGION_SEM "/critical"
+#define EMPTY_SEM "/empty"
+#define FULL_SEM "/full"
+#define STOP '='
 
 void exitOnError(char *msg);
 
 typedef struct memoryStruct {
     char fileID[ID_SIZE];
     int flag;
-    sem_t sem;
-    char map[MEM_SIZE];
+    sem_t* critcalRegion;
+    sem_t* empty;
+    sem_t* full;
+    char* map;
 } memStruct;
 typedef memStruct *memADT;
 
