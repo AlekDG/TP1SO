@@ -1,6 +1,7 @@
 #ifndef UTILS_H
 #define UTILS_H
 
+//Librerias estandar necesarias
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -33,25 +34,17 @@ typedef struct memoryStruct {
 } memStruct;
 typedef memStruct *memADT;
 
+//Funcion que combina perror y exit
 void exitOnError(char *msg);
 
+//Funciones que manipulan Shared Memory
 memADT createSharedMemory(void);
-
 memADT openExistingMemory(char *id);
-
-
-void writeToSHM(memADT m,char* data);
-
 void unlinkMemory(memADT m);
-
 void setFlag(memADT m, int val);
-
 int getFlag(memADT m);
-
 sem_t *getMemorySem(memADT m);
-
 char *getMemoryMap(memADT m);
-
 char *getMemoryID(memADT m);
 
 #endif
