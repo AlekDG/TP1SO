@@ -39,6 +39,9 @@ memADT createSharedMemory(void);
 
 memADT openExistingMemory(char *id);
 
+
+void writeToSHM(memADT m,char* data);
+
 void unlinkMemory(memADT m);
 
 void setFlag(memADT m, int val);

@@ -57,6 +57,7 @@ memADT createSharedMemory(void) {
         return NULL;
     }*/
     mem->flag = 0;
+    printf("Mem Created\n");
     return mem;
 }
 
@@ -71,6 +72,17 @@ memADT openExistingMemory(char *id) {
         return NULL;
     }
     return mem;
+}
+
+void writeToSHM(memADT m,char* data){
+    if (m==NULL)
+        exitOnError("bad memory");
+    int length=strlen(data);
+    if(length<MEM_SIZE)
+        strncpy(m->map,data,length);
+    else
+        strncpy(m->map,data,MEM_SIZE);
+    sem_post(&m->sem);
 }
 
 void unlinkMemory(memADT m) {
@@ -104,10 +116,13 @@ int _openMem(char *id, int oflag, mode_t mode) {
     if (strlen(id) > ID_SIZE) {
         return -1;
     }
+    printf("String OK\n");
     char aux[ID_SIZE + 1];
     aux[0] = '/';
     strcpy(aux + 1, id);
+    printf("%s\n",aux);
     int fd = shm_open(aux, oflag, mode);
+    printf("%d\n",fd);
     if (fd == -1)
         return -1;
     return fd;
