@@ -4,7 +4,7 @@
 #include <strings.h>
 #include <sys/mman.h>
 
-#define PERMS O_CREAT|O_RDWR|O_EXCL
+#define PERMS O_CREAT|O_RDWR
 
 //Prototipos de funciones auxiliares
 int _openMem(char *id, int oflag, mode_t mode);
@@ -30,10 +30,10 @@ memADT createSharedMemory(void) {
     char id[ID_SIZE];
     _randomID(id);
 
-    int fd = _openMem(id, PERMS, S_IRUSR | S_IWUSR);
+    int fd = _openMem(id, PERMS, 0666);
     if (fd == -1)
         return NULL;
-    if (_trunMem(fd) == -1) {
+    if (_trunMem(fd)==-1) {
         _unlinkMem(id);
         return NULL;
     }
@@ -48,11 +48,14 @@ memADT createSharedMemory(void) {
         return NULL;
     }
     mem->flag = 0;
+    printf("Mem Created\n");
     return mem;
 }
 
 memADT openExistingMemory(char *id) {
-    int fd = _openMem(id, O_RDWR, S_IRUSR | S_IWUSR);
+    printf("Attempting to open memory\n");
+    int fd = _openMem(id, O_RDWR, 0666);
+    printf("%d",fd);
     if (fd == -1)
         return NULL;
     memADT mem = _mapMem(fd);
@@ -103,17 +106,20 @@ int _openMem(char *id, int oflag, mode_t mode) {
     if (strlen(id) > ID_SIZE) {
         return -1;
     }
+    printf("String OK\n");
     char aux[ID_SIZE + 1];
     aux[0] = '/';
     strcpy(aux + 1, id);
+    printf("%s\n",aux);
     int fd = shm_open(aux, oflag, mode);
+    printf("%d\n",fd);
     if (fd == -1)
         return -1;
     return fd;
 }
 
 int _trunMem(int fd) {
-    if (ftruncate(fd, sizeof(memStruct)) == -1)
+    if (ftruncate(fd, MEM_SIZE) == -1)
         return -1;
     return 0;
 }
@@ -126,7 +132,7 @@ void _unlinkMem(char *id) {
 }
 
 memADT _mapMem(int fd) {
-    memADT aux = mmap(NULL, sizeof(memStruct), PROT_WRITE, MAP_SHARED, fd, 0);
+    memADT aux = mmap(NULL, MEM_SIZE, PROT_WRITE, MAP_SHARED, fd, 0);
     if (aux == MAP_FAILED)
         return NULL;
     return aux;
