@@ -48,47 +48,25 @@ memADT createSharedMemory(void) {
         return NULL;
     }
     strcpy(mem->fileID, id);
-    //mem->critcalRegion = sem_open(CRITICAL_REGION_SEM,O_CREAT,S_IRWXU,1);
-    //mem->empty = sem_open(EMPTY_SEM,O_CREAT,S_IRWXU,50);
-    //mem->full = sem_open(FULL_SEM,O_CREAT,S_IRWXU,0);
-    
-    /*if (sem_init(&mem->sem, 1, 1) == -1) {
-        _unlinkMem(id);
-        return NULL;
-    }*/
     mem->flag = 0;
-    printf("Mem Created\n");
     return mem;
 }
 
 memADT openExistingMemory(char *id) {
-    memADT mem = malloc(5000);              //REVISAR SI SE PUEDE PONER CON SIZEOF
+    memADT mem = malloc(5000);
     int fd = _openMem(id, O_RDWR, S_IRUSR | S_IWUSR);
     if (fd == -1)
         return NULL;
-    mem->map = _mapMem(fd);
     if (mem == NULL) {
         _unlinkMem(id);
         return NULL;
     }
+    mem->map = _mapMem(fd);
     return mem;
-}
-
-void writeToSHM(memADT m,char* data){
-    if (m==NULL)
-        exitOnError("bad memory");
-    int length=strlen(data);
-    if(length<MEM_SIZE)
-        strncpy(m->map,data,length);
-    else
-        strncpy(m->map,data,MEM_SIZE);
-    sem_post(&m->sem);
 }
 
 void unlinkMemory(memADT m) {
     _unlinkMem(m->fileID);
-    free(m);
-
 }
 
 void setFlag(memADT m, int val) {
@@ -116,13 +94,10 @@ int _openMem(char *id, int oflag, mode_t mode) {
     if (strlen(id) > ID_SIZE) {
         return -1;
     }
-    printf("String OK\n");
     char aux[ID_SIZE + 1];
     aux[0] = '/';
     strcpy(aux + 1, id);
-    printf("%s\n",aux);
     int fd = shm_open(aux, oflag, mode);
-    printf("%d\n",fd);
     if (fd == -1)
         return -1;
     return fd;
@@ -148,6 +123,7 @@ void* _mapMem(int fd) {
     return aux;
 }
 
+//Cada instacia de memoria se identifica con un nombre unico
 void _randomID(char *buffer) {
     char set[] = "QWERTYUIOPASDFGHJKLZXCVBNMqwertyuiopasdfghjklzxcvbnm0123456789";
     int setSize = strlen(set);
